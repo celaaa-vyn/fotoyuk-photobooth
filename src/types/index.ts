@@ -68,8 +68,19 @@ export type QueuedEmail = {
 export type Settings = {
   /** Displayed price in IDR. */
   price: number;
-  /** 4-digit operator/admin PIN. */
+  /**
+   * 4-digit ADMIN PIN. Unlocks the admin panel (price/QRIS/frame edits, PIN
+   * changes, full transaction history + CSV export). This is a higher trust
+   * level than the operator PIN and should NOT be shown to guests.
+   */
   adminPin: string;
+  /**
+   * 4-digit OPERATOR PIN. Confirms the "Sudah Bayar" payment gate on the
+   * payment screen. The operator types this in front of guests on every
+   * session, so it is deliberately a SEPARATE secret from adminPin: leaking it
+   * only advances the flow, it does not expose the admin panel.
+   */
+  operatorPin: string;
   /** Data URL or path of the static QRIS image shown on the payment screen. */
   qrisImage: string | null;
   /** Sender email used by the Resend serverless function. */
