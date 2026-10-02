@@ -4,9 +4,11 @@
  * (hidden on admin). Each step is wrapped in a keyed container so React
  * remounts it on change, replaying the fade-in transition for a smooth feel.
  *
- * The admin screen (price, QRIS/frame uploads, PIN change, history + CSV
- * export) is PIN-gated and reached via a discreet affordance on welcome.
+ * The admin screen is a placeholder here; its full implementation (price,
+ * QRIS/frame uploads, history + CSV export) arrives in a later feature. The
+ * route is wired so navigation never dead-ends.
  */
+import BigButton from './components/ui/BigButton';
 import ProgressBar from './components/ui/ProgressBar';
 import WelcomeScreen from './components/screens/WelcomeScreen';
 import PaymentScreen from './components/screens/PaymentScreen';
@@ -14,10 +16,24 @@ import CameraScreen from './components/screens/CameraScreen';
 import FrameScreen from './components/screens/FrameScreen';
 import EmailScreen from './components/screens/EmailScreen';
 import ThankYouScreen from './components/screens/ThankYouScreen';
-import AdminScreen from './components/screens/AdminScreen';
 import { useKioskStore } from './store/useKioskStore';
-import { useWakeLock } from './hooks/useWakeLock';
 import type { KioskStep } from './types';
+
+/** Lightweight admin placeholder (full admin panel comes in a later feature). */
+function AdminPlaceholder() {
+  const reset = useKioskStore((s) => s.reset);
+  return (
+    <div className="animate-fade-in flex h-full flex-col items-center justify-center gap-6 px-10 text-center">
+      <h1 className="text-big text-primary-700">Panel Admin</h1>
+      <p className="text-touch text-primary-600">
+        Pengaturan harga, QRIS, frame, dan riwayat akan tersedia di sini.
+      </p>
+      <BigButton variant="primary" onClick={reset}>
+        Kembali ke Beranda
+      </BigButton>
+    </div>
+  );
+}
 
 function renderStep(step: KioskStep) {
   switch (step) {
@@ -34,7 +50,7 @@ function renderStep(step: KioskStep) {
     case 'thankyou':
       return <ThankYouScreen />;
     case 'admin':
-      return <AdminScreen />;
+      return <AdminPlaceholder />;
     default:
       return <WelcomeScreen />;
   }
@@ -43,9 +59,6 @@ function renderStep(step: KioskStep) {
 function App() {
   const step = useKioskStore((s) => s.step);
   const showProgress = step !== 'admin';
-
-  // Keep the iPad screen awake for the whole session (no-op when unsupported).
-  useWakeLock();
 
   return (
     <div className="pad-safe flex h-full min-h-full flex-col bg-primary-50 text-primary-900">

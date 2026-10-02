@@ -1,11 +1,8 @@
 /**
  * Payment screen: shows the static QRIS image and the price. The user scans and
  * pays with their own phone. The operator checks their payment notification and
- * taps "Sudah Bayar", which opens the on-screen PIN pad. A correct 4-digit
- * OPERATOR PIN (== settings.operatorPin) advances to the camera. This is a
- * SEPARATE secret from the admin PIN: the operator types it in front of guests
- * on every session, so leaking it only advances the flow and never exposes the
- * admin panel (issue 2). "Batal" returns to welcome.
+ * taps "Sudah Bayar", which opens the on-screen PIN pad. A correct 4-digit PIN
+ * (== settings.adminPin) advances to the camera. "Batal" returns to welcome.
  */
 import { useState } from 'react';
 import BigButton from '../ui/BigButton';
@@ -51,7 +48,7 @@ function PaymentScreen() {
           <>
             <p className="text-touch text-primary-800">Masukkan PIN operator</p>
             <PinPad
-              pin={settings.operatorPin}
+              pin={settings.adminPin}
               onComplete={() => goTo('camera')}
               onError={() => setPinError(true)}
             />
