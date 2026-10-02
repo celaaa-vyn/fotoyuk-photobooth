@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'FotoYuk',
-        short_name: 'FotoYuk',
-        description: 'FotoYuk - photobooth kiosk portabel untuk event.',
+        name: 'Photobooth Kiosk',
+        short_name: 'Photobooth',
+        description: 'Portable photobooth kiosk for events.',
         display: 'fullscreen',
         orientation: 'landscape',
         start_url: '/',

@@ -12,16 +12,7 @@ const AUTO_RESET_SECONDS = 10;
 
 function ThankYouScreen() {
   const reset = useKioskStore((s) => s.reset);
-  const emailOutcome = useKioskStore((s) => s.emailOutcome);
   const [remaining, setRemaining] = useState(AUTO_RESET_SECONDS);
-
-  // Reflect the real delivery state (issue 4): only claim the photo is on its
-  // way when it was actually sent; if it was queued offline/after a failure,
-  // say so instead of overstating delivery.
-  const message =
-    emailOutcome === 'queued'
-      ? 'Foto kamu masuk antrean dan akan dikirim otomatis saat internet kembali.'
-      : 'Foto kamu sedang dikirim ke email.';
 
   useEffect(() => {
     if (remaining <= 0) {
@@ -35,7 +26,7 @@ function ThankYouScreen() {
   return (
     <div className="animate-fade-in flex h-full flex-col items-center justify-center gap-8 px-10 text-center">
       <h1 className="text-huge text-primary-600">Terima Kasih! 🎉</h1>
-      <p className="text-big text-primary-800">{message}</p>
+      <p className="text-big text-primary-800">Foto kamu sedang dikirim ke email.</p>
       <p className="text-touch text-primary-600">
         Kembali ke awal dalam {remaining} detik…
       </p>

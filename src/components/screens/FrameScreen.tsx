@@ -1,14 +1,14 @@
 /**
- * Frame screen: a swipeable/scrollable gallery of transparent frame overlays
- * from settings.frames. As the user selects a frame, a live canvas composite of
- * the four captured photos + the chosen frame is rendered via
- * utils/compositePhoto. The resulting high-quality data URL is stored so the
- * email step can send it as an attachment.
+ * Frame screen (UI shell).
+ *
+ * A swipeable/scrollable gallery of frame overlays from settings.frames. The
+ * user picks one and sees a live preview placeholder of the composite result.
+ * The real canvas compositing (captured photos + transparent PNG frame) is
+ * wired in FEAT-003 at the `COMPOSITE SEAM` below.
  */
 import { useEffect, useState } from 'react';
 import BigButton from '../ui/BigButton';
 import { useKioskStore } from '../../store/useKioskStore';
-import { compositePhoto } from '../../utils/compositePhoto';
 
 function FrameScreen() {
   const goTo = useKioskStore((s) => s.goTo);
@@ -16,73 +16,50 @@ function FrameScreen() {
   const frames = useKioskStore((s) => s.settings.frames);
   const selectedFrameId = useKioskStore((s) => s.selectedFrameId);
   const setFrame = useKioskStore((s) => s.setFrame);
-  const setComposite = useKioskStore((s) => s.setComposite);
   const capturedPhotos = useKioskStore((s) => s.capturedPhotos);
 
   // Default to the first frame if none chosen yet.
   const [selected, setSelected] = useState<string | null>(
     selectedFrameId ?? frames[0]?.id ?? null,
   );
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [building, setBuilding] = useState(false);
-
-  const selectedFrame = frames.find((f) => f.id === selected) ?? null;
 
   useEffect(() => {
     setFrame(selected);
   }, [selected, setFrame]);
 
-  // Rebuild the composite whenever the selection or photos change. The result
-  // is both previewed and stored for the email step. Guard against setting
-  // state after unmount / a newer selection via `cancelled`.
-  useEffect(() => {
-    if (capturedPhotos.length === 0) {
-      setPreviewUrl(null);
-      setComposite(null);
-      return undefined;
-    }
-    let cancelled = false;
-    setBuilding(true);
-    const photoUrls = capturedPhotos.map((p) => p.dataUrl);
-    compositePhoto(photoUrls, selectedFrame?.src ?? null, {
-      type: 'image/jpeg',
-      quality: 0.92,
-    })
-      .then((url) => {
-        if (cancelled) return;
-        setPreviewUrl(url);
-        setComposite(url);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPreviewUrl(null);
-          setComposite(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setBuilding(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFrame, capturedPhotos, setComposite]);
+  const selectedFrame = frames.find((f) => f.id === selected) ?? null;
 
   return (
     <div className="animate-fade-in flex h-full items-center justify-center gap-10 px-10">
-      {/* Live composite preview */}
+      {/* Live composite preview placeholder */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-big text-primary-700">Pratinjau</h2>
         <div className="relative flex h-80 w-44 items-center justify-center overflow-hidden rounded-2xl border-4 border-primary-200 bg-white shadow-xl">
-          {previewUrl ? (
+          {/* COMPOSITE SEAM (FEAT-003): render the canvas composite of
+              capturedPhotos arranged per STRIP_COLUMNS/STRIP_ROWS with the
+              selected frame overlaid. For now, stack photo thumbnails. */}
+          <div className="flex h-full w-full flex-col">
+            {capturedPhotos.length > 0 ? (
+              capturedPhotos.map((p) => (
+                <img
+                  key={p.id}
+                  src={p.dataUrl}
+                  alt="Foto"
+                  className="w-full flex-1 object-cover"
+                />
+              ))
+            ) : (
+              <div className="flex h-full items-center justify-center text-touch text-primary-300">
+                Strip foto
+              </div>
+            )}
+          </div>
+          {selectedFrame && (
             <img
-              src={previewUrl}
-              alt="Pratinjau hasil"
-              className="h-full w-full object-contain"
+              src={selectedFrame.src}
+              alt={selectedFrame.name}
+              className="pointer-events-none absolute inset-0 h-full w-full object-contain"
             />
-          ) : (
-            <div className="flex h-full items-center justify-center text-touch text-primary-300">
-              {building ? 'Memproses…' : 'Strip foto'}
-            </div>
           )}
         </div>
       </div>
@@ -121,7 +98,7 @@ function FrameScreen() {
         <div className="flex gap-4">
           <BigButton
             variant="primary"
-            disabled={!selected || building}
+            disabled={!selected}
             onClick={() => goTo('email')}
           >
             Lanjut

@@ -6,21 +6,19 @@
   "description": "Portable photobooth kiosk PWA optimized for iPad Pro M1 11\" (Safari, landscape, touch).",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && tsc --noEmit -p api/tsconfig.json && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p api/tsconfig.json"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "resend": "^6.32.0",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
-    "@vercel/node": "^18.0.0",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
