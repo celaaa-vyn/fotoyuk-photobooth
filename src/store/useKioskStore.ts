@@ -53,7 +53,7 @@ function envSettings(): Settings {
   return {
     price: defaultPrice(),
     adminPin: import.meta.env.VITE_DEFAULT_ADMIN_PIN ?? '2802',
-    operatorPin: import.meta.env.VITE_DEFAULT_OPERATOR_PIN ?? '1111',
+    operatorPin: import.meta.env.VITE_DEFAULT_OPERATOR_PIN ?? '2802',
     qrisImage: null,
     senderEmail: import.meta.env.VITE_SENDER_EMAIL ?? 'onboarding@resend.dev',
     frames: DEFAULT_FRAMES,

@@ -98,7 +98,7 @@ cp .env.example .env
 | `SEND_EMAIL_SECRET` | **Server only** | _(blank)_ | Optional shared secret for `/api/send-email`. Leave blank to rely on the built-in same-origin check + rate limit (the normal kiosk setup). If set, callers must send it as the `x-kiosk-secret` header. **Do not** prefix it with `VITE_` and never ship it to the browser; it only helps server-to-server callers, not the static kiosk bundle. |
 | `VITE_SENDER_EMAIL` | Client | `onboarding@resend.dev` | From-address for outgoing photo emails. The default works out of the box on the Resend free tier. To send from your own domain, verify it in Resend and set this to an address on that verified domain. |
 | `VITE_DEFAULT_ADMIN_PIN` | Client | `2802` | Default 4-digit **admin** PIN. Unlocks the admin panel (price/QRIS/frame edits, PIN changes, transaction history + CSV). Keep it private. Can be changed later in the admin panel. |
-| `VITE_DEFAULT_OPERATOR_PIN` | Client | `1111` | Default 4-digit **operator** PIN. Confirms the "Sudah Bayar" payment gate. This is a **separate** secret from the admin PIN (the operator types it in front of guests), so leaking it only advances the flow and never exposes the admin panel. Can be changed later in the admin panel. |
+| `VITE_DEFAULT_OPERATOR_PIN` | Client | `2802` | Default 4-digit **operator** PIN. Confirms the "Sudah Bayar" payment gate. This is a **separate** secret from the admin PIN (the operator types it in front of guests), so leaking it only advances the flow and never exposes the admin panel. The default happens to match the admin PIN, but they remain independent settings and can be changed separately in the admin panel. |
 | `VITE_DEFAULT_PRICE` | Client | `25000` | Default displayed price in IDR. Can be changed later in the admin panel. |
 
 > `VITE_*` variables are embedded into the client bundle at build time - do not put secrets
@@ -193,7 +193,8 @@ change the other.
      independently.
    - **View transaction history** and **export it to CSV**.
 
-> The default operator PIN is `1111` (`VITE_DEFAULT_OPERATOR_PIN`). Change both PINs from the
+> The default operator PIN is `2802` (`VITE_DEFAULT_OPERATOR_PIN`), the same value as the
+> default admin PIN, though the two remain separate settings. Change both PINs from the
 > defaults before a real event.
 
 Settings, uploaded images, frames and history are stored in the browser's `localStorage` on
