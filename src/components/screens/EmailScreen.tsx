@@ -33,6 +33,8 @@ function EmailScreen() {
   const selectedFrameId = useKioskStore((s) => s.selectedFrameId);
   const compositeDataUrl = useKioskStore((s) => s.compositeDataUrl);
   const addTransaction = useKioskStore((s) => s.addTransaction);
+  const queuePersistError = useKioskStore((s) => s.queuePersistError);
+  const setEmailOutcome = useKioskStore((s) => s.setEmailOutcome);
 
   const { send } = useEmailQueue();
 
@@ -44,10 +46,20 @@ function EmailScreen() {
 
   const valid = EMAIL_REGEX.test(value.trim());
   const showError = touched && !valid && value.length > 0;
+  // Guard the composite: if frame compositing failed there is nothing to send,
+  // so block submit entirely rather than enqueuing an empty, unsendable payload
+  // that would retry forever (issue 3).
+  const hasComposite = typeof compositeDataUrl === 'string' && compositeDataUrl.length > 0;
 
   const submit = async () => {
     if (!valid) {
       setTouched(true);
+      return;
+    }
+    if (!hasComposite) {
+      // No image to send: never enqueue an empty payload. Steer the guest back
+      // to the frame step to rebuild the composite.
+      setSendError('Foto belum siap. Silakan ulangi pemilihan frame.');
       return;
     }
     const to = value.trim();
@@ -68,11 +80,11 @@ function EmailScreen() {
     };
     addTransaction(tx);
 
-    // No composite should not happen (frame step builds it), but guard anyway.
-    const image = compositeDataUrl ?? '';
+    // hasComposite is guaranteed true here (checked above), so we always send a
+    // real image, never an empty string.
     const result = await send({
       to,
-      imageDataUrl: image,
+      imageDataUrl: compositeDataUrl as string,
       filename: 'fotoyuk-strip.jpg',
       transactionId: tx.id,
     });
@@ -80,10 +92,12 @@ function EmailScreen() {
     setSending(false);
 
     if (result.sent) {
+      setEmailOutcome('sent');
       goTo('thankyou');
       return;
     }
     // Queued (offline or failed): tell the user, offer resend + continue.
+    setEmailOutcome('queued');
     setQueuedNote(true);
     setSendError(result.error ?? null);
   };
@@ -94,6 +108,18 @@ function EmailScreen() {
       <p className="text-touch max-w-xl text-primary-700">
         Masukkan email kamu, hasil foto akan dikirim sebagai lampiran.
       </p>
+
+      {!hasComposite && (
+        <div className="animate-pop flex max-w-xl flex-col gap-2 rounded-2xl bg-accent-50 px-6 py-4">
+          <p className="text-touch font-semibold text-accent-700">
+            Foto belum siap diproses.
+          </p>
+          <p className="text-base text-accent-600">
+            Hasil foto dengan frame gagal dibuat. Silakan kembali ke pemilihan
+            frame untuk mencoba lagi.
+          </p>
+        </div>
+      )}
 
       <div className="flex w-full max-w-xl flex-col gap-2">
         <input
@@ -131,14 +157,31 @@ function EmailScreen() {
             Foto akan dikirim otomatis saat internet kembali. Kamu bisa coba
             kirim ulang atau lanjut.
           </p>
+          {queuePersistError && (
+            <p className="text-sm font-semibold text-accent-600">
+              Perhatian: penyimpanan antrean penuh, antrean mungkin hilang jika
+              aplikasi dimuat ulang. Sebaiknya coba kirim ulang sekarang.
+            </p>
+          )}
           {sendError && (
             <p className="text-sm text-accent-500">Detail: {sendError}</p>
           )}
         </div>
       )}
 
+      {/* Show the composite-not-ready error outside the queued flow too. */}
+      {!queuedNote && sendError && !hasComposite && (
+        <p className="animate-pop text-touch font-semibold text-accent-600">
+          {sendError}
+        </p>
+      )}
+
       <div className="flex flex-wrap justify-center gap-4">
-        {!queuedNote ? (
+        {!hasComposite ? (
+          <BigButton variant="primary" onClick={() => goTo('frame')}>
+            Kembali ke Frame
+          </BigButton>
+        ) : !queuedNote ? (
           <BigButton
             variant="primary"
             disabled={!valid || sending}

@@ -5,7 +5,8 @@
  *  - edit the displayed price (persisted to settings)
  *  - upload a static QRIS image (stored as a data URL in settings)
  *  - upload new transparent frame PNGs (appended to settings.frames)
- *  - change the admin PIN
+ *  - change the ADMIN PIN (unlocks this panel) and the separate OPERATOR PIN
+ *    (confirms the "Sudah Bayar" payment gate) - two distinct secrets (issue 2)
  *  - view the transaction history table and export it as CSV
  *
  * A "Kembali ke Beranda" button always returns to welcome so navigation never
@@ -40,6 +41,7 @@ function AdminScreen() {
   const transactions = useKioskStore((s) => s.transactions);
   const setPrice = useKioskStore((s) => s.setPrice);
   const setAdminPin = useKioskStore((s) => s.setAdminPin);
+  const setOperatorPin = useKioskStore((s) => s.setOperatorPin);
   const setQrisImage = useKioskStore((s) => s.setQrisImage);
   const addFrame = useKioskStore((s) => s.addFrame);
   const removeFrame = useKioskStore((s) => s.removeFrame);
@@ -51,6 +53,7 @@ function AdminScreen() {
   // Local form state.
   const [priceInput, setPriceInput] = useState(String(settings.price));
   const [newPin, setNewPin] = useState('');
+  const [newOperatorPin, setNewOperatorPin] = useState('');
   const [status, setStatus] = useState<string | null>(null);
 
   // --- PIN gate ----------------------------------------------------------
@@ -128,9 +131,19 @@ function AdminScreen() {
     if (/^\d{4}$/.test(newPin)) {
       setAdminPin(newPin);
       setNewPin('');
-      setStatus('PIN diperbarui.');
+      setStatus('PIN admin diperbarui.');
     } else {
-      setStatus('PIN harus 4 digit angka.');
+      setStatus('PIN admin harus 4 digit angka.');
+    }
+  };
+
+  const changeOperatorPin = () => {
+    if (/^\d{4}$/.test(newOperatorPin)) {
+      setOperatorPin(newOperatorPin);
+      setNewOperatorPin('');
+      setStatus('PIN operator diperbarui.');
+    } else {
+      setStatus('PIN operator harus 4 digit angka.');
     }
   };
 
@@ -179,20 +192,45 @@ function AdminScreen() {
           </div>
         </section>
 
-        {/* PIN */}
+        {/* Admin PIN */}
         <section className="flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-md">
           <h2 className="text-touch font-bold text-primary-700">Ubah PIN Admin</h2>
+          <p className="text-base text-primary-600">
+            Membuka panel admin ini. Jangan ditunjukkan ke tamu.
+          </p>
           <div className="flex gap-3">
             <input
               type="text"
               inputMode="numeric"
               maxLength={4}
-              placeholder="PIN baru (4 digit)"
+              placeholder="PIN admin baru (4 digit)"
               value={newPin}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
               className="min-h-touch w-full rounded-xl border-2 border-primary-200 px-4 text-touch focus:border-primary-500 focus:outline-none"
             />
             <BigButton variant="primary" onClick={changePin}>
+              Ubah
+            </BigButton>
+          </div>
+        </section>
+
+        {/* Operator PIN */}
+        <section className="flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-md">
+          <h2 className="text-touch font-bold text-primary-700">Ubah PIN Operator</h2>
+          <p className="text-base text-primary-600">
+            Dipakai di tombol "Sudah Bayar". Berbeda dari PIN admin.
+          </p>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="PIN operator baru (4 digit)"
+              value={newOperatorPin}
+              onChange={(e) => setNewOperatorPin(e.target.value.replace(/\D/g, ''))}
+              className="min-h-touch w-full rounded-xl border-2 border-primary-200 px-4 text-touch focus:border-primary-500 focus:outline-none"
+            />
+            <BigButton variant="primary" onClick={changeOperatorPin}>
               Ubah
             </BigButton>
           </div>

@@ -12,7 +12,7 @@ export type SendEmailParams = {
   to: string;
   /** Final image as a base64 string (no `data:` prefix) OR a full data URL. */
   imageBase64: string;
-  /** Attachment filename, e.g. "photobooth-strip.jpg". */
+  /** Attachment filename, e.g. "fotoyuk-strip.jpg". */
   filename: string;
 };
 

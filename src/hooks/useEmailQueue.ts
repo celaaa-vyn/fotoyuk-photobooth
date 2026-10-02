@@ -25,6 +25,15 @@ function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Maximum number of send attempts before a queued email is permanently
+ * dropped. Without this cap a payload that can never succeed (e.g. a rejected
+ * empty-image item, or a permanently invalid address) would retry forever on
+ * every connectivity change (issue 3). After this many failed attempts the
+ * item is evicted and its transaction marked 'failed'.
+ */
+const MAX_ATTEMPTS = 5;
+
 export type QueueSendParams = {
   to: string;
   /** Final composite image as a data URL or raw base64. */
@@ -84,12 +93,25 @@ export function useEmailQueue(): UseEmailQueueResult {
             });
           }
         } else {
-          updateQueuedEmail(item.id, {
-            attempts: item.attempts + 1,
-            lastError: result.error,
-          });
-          if (item.transactionId) {
-            updateTransaction(item.transactionId, { attempts: item.attempts + 1 });
+          const attempts = item.attempts + 1;
+          if (attempts >= MAX_ATTEMPTS) {
+            // Poison item: give up permanently so it stops re-failing on every
+            // 'online' event. Drop it and mark the transaction failed.
+            dequeueEmail(item.id);
+            if (item.transactionId) {
+              updateTransaction(item.transactionId, {
+                emailStatus: 'failed',
+                attempts,
+              });
+            }
+          } else {
+            updateQueuedEmail(item.id, {
+              attempts,
+              lastError: result.error,
+            });
+            if (item.transactionId) {
+              updateTransaction(item.transactionId, { attempts });
+            }
           }
         }
       }

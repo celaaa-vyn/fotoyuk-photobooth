@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: 'FotoYuk',
         short_name: 'FotoYuk',
-        description: 'FotoYuk — photobooth kiosk portabel untuk event.',
+        description: 'FotoYuk - photobooth kiosk portabel untuk event.',
         display: 'fullscreen',
         orientation: 'landscape',
         start_url: '/',

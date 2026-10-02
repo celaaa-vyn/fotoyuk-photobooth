@@ -8,7 +8,7 @@ The flow is deliberately simple so guests can self-serve and an operator only st
 confirm payment:
 
 1. **Welcome** – one big "Mulai" button + short instruction ("bayar dulu ke QRIS, lalu panggil operator").
-2. **Payment** – shows a static QRIS image and the price. The guest scans and pays with their own phone; the operator checks the payment notification and taps **"Sudah Bayar"**, which is PIN-protected (4 digits). A **Batal** button returns to Welcome.
+2. **Payment** – shows a static QRIS image and the price. The guest scans and pays with their own phone; the operator checks the payment notification and taps **"Sudah Bayar"**, which is protected by the 4-digit **operator PIN** (separate from the admin PIN). A **Batal** button returns to Welcome.
 3. **Camera** – front camera (`facingMode: "user"`), 3-second countdown, captures **exactly 4 photos** in a row with a per-photo preview and one retake.
 4. **Frame** – gallery of transparent PNG frames; the guest swipes and picks one, with a live preview of the composite. The main output is a **parametric vertical strip** (2×6-style layout).
 5. **Email** – the guest types their email (format-validated, the iPad keyboard pops up automatically); the final image is sent as an **attachment**.
@@ -27,7 +27,7 @@ confirm payment:
 ## Key behaviours
 
 - **Exactly 4 photos** are captured per session.
-- The final image is a **parametric vertical strip** — the strip dimensions, gaps and photo
+- The final image is a **parametric vertical strip** - the strip dimensions, gaps and photo
   cells are computed in code (`src/utils/compositePhoto.ts`), so the layout scales cleanly
   and the frame overlay is drawn on top.
 - The **live preview is mirrored** (`transform: scaleX(-1)`) so it feels natural, but the
@@ -94,13 +94,31 @@ cp .env.example .env
 
 | Variable | Scope | Default | Purpose |
 | --- | --- | --- | --- |
-| `RESEND_API_KEY` | **Server only** | _(blank)_ | Resend API key used by the serverless email function. Get it from the Resend dashboard (free tier). Set it in **Vercel → Settings → Environment Variables**; it is read via `process.env` on the server and **never shipped to the browser**. Never commit a real key. |
+| `RESEND_API_KEY` | **Server only** | _(blank)_ | Resend API key used by the serverless email function. Get it from the Resend dashboard (free tier). Set it in **Vercel -> Settings -> Environment Variables**; it is read via `process.env` on the server and **never shipped to the browser**. Never commit a real key. |
+| `SEND_EMAIL_SECRET` | **Server only** | _(blank)_ | Optional shared secret for `/api/send-email`. Leave blank to rely on the built-in same-origin check + rate limit (the normal kiosk setup). If set, callers must send it as the `x-kiosk-secret` header. **Do not** prefix it with `VITE_` and never ship it to the browser; it only helps server-to-server callers, not the static kiosk bundle. |
 | `VITE_SENDER_EMAIL` | Client | `onboarding@resend.dev` | From-address for outgoing photo emails. The default works out of the box on the Resend free tier. To send from your own domain, verify it in Resend and set this to an address on that verified domain. |
-| `VITE_DEFAULT_ADMIN_PIN` | Client | `2802` | Default 4-digit operator/admin PIN. Can be changed later in the admin panel. |
+| `VITE_DEFAULT_ADMIN_PIN` | Client | `2802` | Default 4-digit **admin** PIN. Unlocks the admin panel (price/QRIS/frame edits, PIN changes, transaction history + CSV). Keep it private. Can be changed later in the admin panel. |
+| `VITE_DEFAULT_OPERATOR_PIN` | Client | `1111` | Default 4-digit **operator** PIN. Confirms the "Sudah Bayar" payment gate. This is a **separate** secret from the admin PIN (the operator types it in front of guests), so leaking it only advances the flow and never exposes the admin panel. Can be changed later in the admin panel. |
 | `VITE_DEFAULT_PRICE` | Client | `25000` | Default displayed price in IDR. Can be changed later in the admin panel. |
 
-> `VITE_*` variables are embedded into the client bundle at build time — do not put secrets
-> in them. `RESEND_API_KEY` is the only secret and it stays server-side.
+> `VITE_*` variables are embedded into the client bundle at build time - do not put secrets
+> in them. The server-only secrets (`RESEND_API_KEY`, optional `SEND_EMAIL_SECRET`) stay
+> server-side and are never shipped to the browser.
+
+### Email endpoint abuse protection
+
+`/api/send-email` is public by nature (the kiosk is a static client that calls it), so it is
+protected without any database:
+
+- **Same-origin check** - requests whose `Origin`/`Referer` host is not the deployment's own
+  host are rejected (403). Browsers cannot forge these headers from another site, so this
+  blocks cross-site abuse while the kiosk (same origin) keeps working.
+- **Per-IP rate limit** - a coarse in-memory sliding window (10 requests / minute per warm
+  instance) throttles bursts and returns 429 when exceeded. It is best-effort (serverless
+  instances are ephemeral), not a global quota.
+- **Optional shared secret** - set `SEND_EMAIL_SECRET` (server only) to additionally require
+  the `x-kiosk-secret` header. Because any value shipped to the static client bundle is not
+  secret, this is only useful for server-to-server callers, not the kiosk itself.
 
 ## Run locally
 
@@ -112,7 +130,7 @@ npm run typecheck  # TypeScript type-check only (app + api)
 ```
 
 > The camera (`getUserMedia`) requires **HTTPS**. It works on `http://localhost` for
-> development, but on the iPad you must open an **HTTPS** URL (deploy to Vercel — see below).
+> development, but on the iPad you must open an **HTTPS** URL (deploy to Vercel - see below).
 > Email sending also needs the serverless function, which runs on Vercel (or `vercel dev`).
 
 ## Deploy to Vercel
@@ -123,11 +141,11 @@ npm run typecheck  # TypeScript type-check only (app + api)
    directory is `dist` (both pinned in `vercel.json`). The `api/` folder is deployed as
    serverless functions automatically, so `POST /api/send-email` is live.
 3. In **Project → Settings → Environment Variables**, add:
-   - `RESEND_API_KEY` (**required** — your Resend key),
-   - optionally `VITE_SENDER_EMAIL`, `VITE_DEFAULT_ADMIN_PIN`, `VITE_DEFAULT_PRICE` if you
-     want non-default values.
+   - `RESEND_API_KEY` (**required** - your Resend key),
+   - optionally `SEND_EMAIL_SECRET`, `VITE_SENDER_EMAIL`, `VITE_DEFAULT_ADMIN_PIN`,
+     `VITE_DEFAULT_OPERATOR_PIN`, `VITE_DEFAULT_PRICE` if you want non-default values.
 4. **Deploy.** Vercel serves over **HTTPS automatically**, which satisfies the camera
-   requirement — no extra certificate setup needed.
+   requirement - no extra certificate setup needed.
 
 ## Testing on the iPad
 
@@ -159,17 +177,24 @@ npm run typecheck  # TypeScript type-check only (app + api)
 
 ## Admin panel
 
-The admin/operator panel is PIN-gated and reached via a discreet affordance on the Welcome
-screen (and it is where the "Sudah Bayar" PIN comes from).
+The admin panel is PIN-gated and reached via a discreet affordance on the Welcome screen.
+It uses the **admin PIN**, which is deliberately **separate** from the **operator PIN** that
+confirms the "Sudah Bayar" payment gate. This way the operator can type the operator PIN in
+front of guests on every session without exposing admin access. Changing one PIN does not
+change the other.
 
-1. Open the admin entry from the Welcome screen and enter the PIN (**default `2802`**, or your
-   `VITE_DEFAULT_ADMIN_PIN`).
+1. Open the admin entry from the Welcome screen and enter the **admin PIN** (**default `2802`**,
+   or your `VITE_DEFAULT_ADMIN_PIN`).
 2. From there you can:
    - **Set the displayed price** (IDR).
    - **Upload the static QRIS image** shown on the payment screen.
    - **Upload new frame PNGs** (transparent overlays) for the frame gallery.
-   - **Change the admin/operator PIN.**
+   - **Change the admin PIN** (unlocks this panel) and the **operator PIN** (payment gate)
+     independently.
    - **View transaction history** and **export it to CSV**.
+
+> The default operator PIN is `1111` (`VITE_DEFAULT_OPERATOR_PIN`). Change both PINs from the
+> defaults before a real event.
 
 Settings, uploaded images, frames and history are stored in the browser's `localStorage` on
 that iPad, so they persist across reloads but stay on the device.
