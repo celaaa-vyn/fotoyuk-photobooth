@@ -16,6 +16,7 @@ import EmailScreen from './components/screens/EmailScreen';
 import ThankYouScreen from './components/screens/ThankYouScreen';
 import AdminScreen from './components/screens/AdminScreen';
 import { useKioskStore } from './store/useKioskStore';
+import { useWakeLock } from './hooks/useWakeLock';
 import type { KioskStep } from './types';
 
 function renderStep(step: KioskStep) {
@@ -42,6 +43,9 @@ function renderStep(step: KioskStep) {
 function App() {
   const step = useKioskStore((s) => s.step);
   const showProgress = step !== 'admin';
+
+  // Keep the iPad screen awake for the whole session (no-op when unsupported).
+  useWakeLock();
 
   return (
     <div className="pad-safe flex h-full min-h-full flex-col bg-primary-50 text-primary-900">
