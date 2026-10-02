@@ -92,6 +92,8 @@ export type KioskState = {
   capturedPhotos: CapturedPhoto[];
   /** Id of the frame chosen on the frame screen. */
   selectedFrameId: string | null;
+  /** Final composited strip (photos + frame) as a data URL, set on the frame screen. */
+  compositeDataUrl: string | null;
   /** Email entered by the user on the email screen. */
   email: string;
   /** Admin-configurable settings (persisted). */
@@ -109,6 +111,7 @@ export type KioskState = {
   /* ---- session data ---- */
   setPhotos: (photos: CapturedPhoto[]) => void;
   setFrame: (frameId: string | null) => void;
+  setComposite: (dataUrl: string | null) => void;
   setEmail: (email: string) => void;
 
   /* ---- settings mutators (admin) ---- */
@@ -131,6 +134,7 @@ export const useKioskStore = create<KioskState>((set) => ({
   step: 'welcome',
   capturedPhotos: [],
   selectedFrameId: null,
+  compositeDataUrl: null,
   email: '',
   settings: hydrateSettings(),
   transactions: readJSON<Transaction[]>(LS_TRANSACTIONS, []),
@@ -143,11 +147,13 @@ export const useKioskStore = create<KioskState>((set) => ({
       step: 'welcome',
       capturedPhotos: [],
       selectedFrameId: null,
+      compositeDataUrl: null,
       email: '',
     }),
 
   setPhotos: (capturedPhotos) => set({ capturedPhotos }),
   setFrame: (selectedFrameId) => set({ selectedFrameId }),
+  setComposite: (compositeDataUrl) => set({ compositeDataUrl }),
   setEmail: (email) => set({ email }),
 
   setPrice: (price) =>

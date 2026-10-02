@@ -1,12 +1,13 @@
-# Photobooth Kiosk
+# FotoYuk
 
 Portable photobooth web app optimized for **iPad Pro M1 11" (Safari, landscape, touch)**.
 Built as an installable PWA so it can run full-screen as an event kiosk. Budget target is
 zero / near-zero using free tiers (Vercel hosting + Resend email).
 
-> Status: project scaffold and build baseline (FEAT-001). The full six-step kiosk flow,
-> camera capture, frame compositing, email sending, admin panel, and offline queue are
-> implemented in later features.
+> Status: core kiosk logic implemented (FEAT-003) — front-camera capture (mirrored
+> preview, un-mirrored saved photos), canvas strip compositing with frame overlay, the
+> Resend serverless email function, offline email queue with auto-retry, and the
+> PIN-protected admin panel (price, QRIS/frame uploads, history + CSV export).
 
 ## Tech stack
 
