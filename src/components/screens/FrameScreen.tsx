@@ -54,7 +54,10 @@ function FrameScreen() {
         setComposite(url);
       })
       .catch(() => {
-        if (!cancelled) setPreviewUrl(null);
+        if (!cancelled) {
+          setPreviewUrl(null);
+          setComposite(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setBuilding(false);
