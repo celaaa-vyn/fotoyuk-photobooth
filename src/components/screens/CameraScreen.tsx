@@ -1,19 +1,21 @@
 /**
- * Camera screen (UI shell).
+ * Camera screen: live front-camera preview, a 3-second countdown before each
+ * shot, exactly PHOTO_COUNT sequential photos, per-photo thumbnails and a
+ * single retake of the whole set, then it stores the un-mirrored data URLs and
+ * advances to the frame step.
  *
- * This feature builds the structure and flow; the real getUserMedia camera
- * hook, mirrored live preview and un-mirrored capture are wired in FEAT-003 at
- * the clearly-marked seams below (see `CAMERA SEAM`). For now the live preview
- * area is a placeholder and "capture" produces a lightweight placeholder photo
- * so the countdown / preview / retake flow can be exercised and type-checked.
+ * Mirroring rule (authoritative): the live <video> preview is mirrored via CSS
+ * `transform: scaleX(-1)` so it feels natural, but useCamera.capture() grabs
+ * UN-mirrored pixels so text printed on frames reads correctly.
  *
- * Flow: a 3-second countdown precedes each of PHOTO_COUNT sequential shots.
- * Each captured photo gets a thumbnail. The user may retake the whole set once.
- * After PHOTO_COUNT photos the user proceeds to the frame step.
+ * Error handling: if the camera is denied/unavailable, the user sees clear
+ * instructions for enabling it in Safari plus retry and back-to-welcome paths,
+ * so no one gets stuck here.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import BigButton from '../ui/BigButton';
 import { useKioskStore } from '../../store/useKioskStore';
+import { useCamera } from '../../hooks/useCamera';
 import type { CapturedPhoto } from '../../types';
 
 /** Number of photos captured per session. Authoritative decision: exactly 4. */
@@ -26,54 +28,46 @@ const COUNTDOWN_SECONDS = 3;
  * Strip layout grid constants. The default is a vertical photo strip holding
  * all PHOTO_COUNT photos in a single column. To switch to a classic 2-column
  * booth strip set STRIP_COLUMNS = 2 and STRIP_ROWS = PHOTO_COUNT / 2.
- * These are consumed by the canvas compositor (FEAT-003).
+ * These are consumed by the canvas compositor (utils/compositePhoto).
  */
 export const STRIP_COLUMNS = 1; // vertical strip: 1 column
 export const STRIP_ROWS = PHOTO_COUNT; // ...with PHOTO_COUNT rows
 
 type Phase = 'idle' | 'countdown' | 'done';
 
-/**
- * CAMERA SEAM (FEAT-003): replace this with a real frame grab from the
- * <video> element drawn un-mirrored onto a canvas, returning a JPEG/PNG data
- * URL. For the shell we emit a tiny placeholder data URL so the flow works.
- */
-function capturePlaceholderPhoto(index: number): CapturedPhoto {
-  return {
-    id: `photo-${Date.now()}-${index}`,
-    dataUrl:
-      'data:image/svg+xml;utf8,' +
-      encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="100%" height="100%" fill="#dbeafe"/><text x="50%" y="50%" font-size="48" fill="#2563eb" text-anchor="middle" dominant-baseline="middle">${index + 1}</text></svg>`,
-      ),
-    takenAt: Date.now(),
-  };
-}
-
 function CameraScreen() {
   const goTo = useKioskStore((s) => s.goTo);
   const reset = useKioskStore((s) => s.reset);
   const setPhotos = useKioskStore((s) => s.setPhotos);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const { videoRef, ready, error, start, stop, capture } = useCamera();
+
   const [phase, setPhase] = useState<Phase>('idle');
   const [count, setCount] = useState(COUNTDOWN_SECONDS);
   const [photos, setLocalPhotos] = useState<CapturedPhoto[]>([]);
   const [retakeUsed, setRetakeUsed] = useState(false);
 
-  /*
-   * CAMERA SEAM (FEAT-003): start/stop the getUserMedia stream here with
-   * facingMode "user", ideal 1920x1080 + fallback, and attach it to videoRef.
-   * The live preview is shown mirrored (scaleX(-1)); captured frames stay
-   * un-mirrored so frame text reads correctly.
-   */
+  // Keep a live ref of photos so the countdown effect reads a stable length.
+  const photosRef = useRef<CapturedPhoto[]>([]);
+  photosRef.current = photos;
 
-  /** Capture one placeholder photo, advancing the on-screen counter. */
+  // Start the camera on mount; stop it on unmount.
+  useEffect(() => {
+    void start();
+    return () => stop();
+  }, [start, stop]);
+
+  /** Grab one un-mirrored frame and append it to the local set. */
   const takeShot = useCallback(
     (index: number) => {
-      setLocalPhotos((prev) => [...prev, capturePlaceholderPhoto(index)]);
+      const dataUrl = capture('image/jpeg', 0.95);
+      if (!dataUrl) return;
+      setLocalPhotos((prev) => [
+        ...prev,
+        { id: `photo-${Date.now()}-${index}`, dataUrl, takenAt: Date.now() },
+      ]);
     },
-    [],
+    [capture],
   );
 
   /** Drive the per-shot countdown; captures when it hits zero. */
@@ -84,7 +78,7 @@ function CameraScreen() {
       return () => window.clearTimeout(t);
     }
     // Countdown reached zero: capture the next shot.
-    const nextIndex = photos.length;
+    const nextIndex = photosRef.current.length;
     takeShot(nextIndex);
     if (nextIndex + 1 < PHOTO_COUNT) {
       setCount(COUNTDOWN_SECONDS); // continue to the next shot
@@ -92,7 +86,7 @@ function CameraScreen() {
       setPhase('done');
     }
     return undefined;
-  }, [phase, count, photos.length, takeShot]);
+  }, [phase, count, takeShot]);
 
   const startSession = () => {
     setLocalPhotos([]);
@@ -112,11 +106,36 @@ function CameraScreen() {
     goTo('frame');
   };
 
+  // --- Camera permission / availability error state ---------------------
+  if (error) {
+    return (
+      <div className="animate-fade-in flex h-full flex-col items-center justify-center gap-6 px-10 text-center">
+        <h2 className="text-big text-accent-600">Kamera Tidak Bisa Diakses</h2>
+        <p className="text-touch max-w-xl text-primary-700">{error.message}</p>
+        {error.kind === 'permission-denied' && (
+          <ol className="max-w-xl list-decimal space-y-2 text-left text-base text-primary-700">
+            <li>Buka Pengaturan iPad &rarr; Safari &rarr; Kamera.</li>
+            <li>Pilih &ldquo;Izinkan&rdquo; untuk situs ini.</li>
+            <li>Kembali ke aplikasi, lalu tekan &ldquo;Coba Lagi&rdquo;.</li>
+          </ol>
+        )}
+        <div className="flex gap-4">
+          <BigButton variant="primary" onClick={() => void start()}>
+            Coba Lagi
+          </BigButton>
+          <BigButton variant="danger" onClick={reset}>
+            Kembali ke Beranda
+          </BigButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in flex h-full flex-col items-center gap-6 px-8 py-4">
       {/* Big centered landscape live-preview area */}
       <div className="relative flex w-full max-w-5xl flex-1 items-center justify-center overflow-hidden rounded-3xl bg-primary-900 shadow-xl">
-        {/* CAMERA SEAM (FEAT-003): mirrored live video goes here. */}
+        {/* Mirrored live preview; captured frames stay un-mirrored. */}
         <video
           ref={videoRef}
           autoPlay
@@ -125,7 +144,10 @@ function CameraScreen() {
           className="h-full w-full object-cover"
           style={{ transform: 'scaleX(-1)' }}
         />
-        {phase === 'idle' && (
+        {!ready && (
+          <p className="absolute text-touch text-white/80">Menyalakan kamera…</p>
+        )}
+        {ready && phase === 'idle' && (
           <p className="absolute text-touch text-white/80">
             Siap berfoto? Tekan mulai!
           </p>
@@ -170,7 +192,7 @@ function CameraScreen() {
       {/* Controls */}
       <div className="flex items-center gap-4">
         {phase === 'idle' && (
-          <BigButton variant="primary" onClick={startSession}>
+          <BigButton variant="primary" disabled={!ready} onClick={startSession}>
             Mulai Foto
           </BigButton>
         )}
