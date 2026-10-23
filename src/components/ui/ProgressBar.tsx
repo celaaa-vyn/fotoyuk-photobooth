@@ -9,8 +9,8 @@ import type { KioskStep } from '../../types';
 const FLOW_STEPS: { step: KioskStep; label: string }[] = [
   { step: 'welcome', label: 'Mulai' },
   { step: 'payment', label: 'Bayar' },
-  { step: 'camera', label: 'Foto' },
   { step: 'frame', label: 'Frame' },
+  { step: 'camera', label: 'Foto' },
   { step: 'email', label: 'Email' },
   { step: 'thankyou', label: 'Selesai' },
 ];
