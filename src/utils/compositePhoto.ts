@@ -1,45 +1,52 @@
 /**
- * compositePhoto: draw the captured photos into a photo strip on an HTML
- * Canvas, overlay the selected transparent frame PNG, and export a
- * high-quality image data URL.
- *
- * The arrangement is parametric via STRIP_COLUMNS / STRIP_ROWS (re-exported
- * from CameraScreen). The default is a VERTICAL strip: 1 column x 4 rows, i.e.
- * four photos stacked top-to-bottom. Switching to a classic 2-up booth strip
- * is a one-line change at the source of the constants (STRIP_COLUMNS = 2,
- * STRIP_ROWS = PHOTO_COUNT / 2) — the grid math below adapts automatically.
+ * compositePhoto: draw the captured photos into a frame on an HTML Canvas,
+ * overlay the selected transparent frame PNG, and export a high-quality image
+ * data URL.
  *
  * ----------------------------------------------------------------------------
- * GRID MATH
+ * TWO RENDER PATHS
  * ----------------------------------------------------------------------------
- * The output canvas is a fixed-size strip (STRIP_WIDTH x STRIP_HEIGHT) with a
- * uniform PADDING around the edges and a GUTTER between cells. Given COLS and
- * ROWS cells:
+ * 1. SLOT-BASED (primary, "Option Y"): when the frame carries an explicit
+ *    `slots[]` list (defined visually by the admin in the Frame Editor), each
+ *    captured photo i is drawn into slot i. Slots are stored in
+ *    resolution-independent 0..1 units relative to the frame artwork, so the
+ *    output canvas size is derived from the frame PNG's natural dimensions and
+ *    the slot rectangle is simply slot.(x,y,width,height) * canvas.(w,h). Inside
+ *    each slot the photo is drawn with object-fit: cover, then the admin's
+ *    per-slot `zoom` (tighter crop) and `offsetX/offsetY` (pan) are applied, and
+ *    the draw is CLIPPED to the slot rectangle so a photo can never bleed into
+ *    its neighbour. The frame PNG is overlaid on top so its transparent cut-outs
+ *    reveal the photos beneath. The customer never adjusts any of this: the
+ *    layout is purely the admin-defined configuration.
  *
- *   usableW = STRIP_WIDTH  - 2*PADDING - (COLS - 1)*GUTTER
- *   usableH = STRIP_HEIGHT - 2*PADDING - (ROWS - 1)*GUTTER
- *   cellW   = usableW / COLS
- *   cellH   = usableH / ROWS
+ * 2. LEGACY STRIP (fallback): frames WITHOUT slots (older persisted uploads)
+ *    fall back to the original parametric grid (STRIP_COLUMNS x STRIP_ROWS on a
+ *    fixed STRIP_WIDTH x STRIP_HEIGHT canvas) so pre-existing frames still
+ *    composite without any migration.
  *
- * Cell (r, c) — row r (0-based, top→bottom), col c (0-based, left→right):
- *   x = PADDING + c*(cellW + GUTTER)
- *   y = PADDING + r*(cellH + GUTTER)
- *
- * Photos fill their index in reading order (row-major): index = r*COLS + c.
- * Each photo is drawn with object-fit: cover semantics (centred crop) so it
- * fills its cell without distortion. The frame PNG is then stretched over the
- * whole canvas on top, so transparent cut-outs reveal the photos beneath.
+ * Mirroring rule (authoritative): captured photos are already un-mirrored, and
+ * this function does not flip them, so printed text on frames reads correctly.
+ * Output is a high-quality JPEG by default (smaller for email).
  * ----------------------------------------------------------------------------
  */
 import { STRIP_COLUMNS, STRIP_ROWS } from '../components/screens/CameraScreen';
+import type { FrameSlot } from '../types';
 
-/** Output strip pixel size. 2:6 aspect-ish vertical strip, high resolution. */
+/** Output strip pixel size for the LEGACY path. Vertical strip, high resolution. */
 export const STRIP_WIDTH = 1200;
 export const STRIP_HEIGHT = 3600;
 
-/** Uniform outer padding and inter-cell gutter (device pixels). */
+/** Uniform outer padding and inter-cell gutter (device pixels) for LEGACY path. */
 const PADDING = 48;
 const GUTTER = 36;
+
+/**
+ * Fallback output size for the SLOT path when the frame image's natural size is
+ * unavailable (e.g. a broken frame src). Keeps the same proportions as the
+ * legacy strip so default slots still land sensibly.
+ */
+const SLOT_FALLBACK_WIDTH = STRIP_WIDTH;
+const SLOT_FALLBACK_HEIGHT = STRIP_HEIGHT;
 
 /** Background colour behind the photos (shows through frame transparency). */
 const BACKGROUND = '#ffffff';
@@ -52,7 +59,7 @@ export type CompositeOptions = {
 };
 
 /** Load an image source (data URL or path) into a decoded HTMLImageElement. */
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     // Allow drawing cross-origin frame assets to the canvas without tainting.
@@ -84,17 +91,124 @@ function drawCover(
 }
 
 /**
- * Compose the captured photos + frame into a single strip image.
+ * Draw one source image into a slot rectangle (already in DEVICE PIXELS) using
+ * object-fit: cover, then apply the slot's `zoom` (tighter crop => zoom in) and
+ * `offsetX/offsetY` pan (in slot-relative units, roughly -1..1), CLIPPED to the
+ * slot box so the photo cannot bleed outside it.
  *
- * @param photoDataUrls Captured photo data URLs (un-mirrored). Extra photos
- *   beyond COLS*ROWS are ignored; missing cells are left as background.
- * @param frameSrc      Transparent frame PNG path/data URL, or null for none.
- * @returns             A data URL of the composited strip.
+ * This is the single source of truth for slot rendering: both the final
+ * compositor and the admin editor's live preview call it, so the editor is
+ * WYSIWYG with the exported image.
  */
-export async function compositePhoto(
+export function drawSlotImage(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  imgW: number,
+  imgH: number,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+  slot: Pick<FrameSlot, 'zoom' | 'offsetX' | 'offsetY'>,
+): void {
+  if (dw <= 0 || dh <= 0 || imgW <= 0 || imgH <= 0) return;
+
+  const zoom = slot.zoom > 0 ? slot.zoom : 1;
+
+  // Base object-fit: cover sample size for the slot box.
+  const coverScale = Math.max(dw / imgW, dh / imgH);
+  // Applying zoom tightens the crop: sample a smaller 1/zoom region.
+  const scale = coverScale * zoom;
+  const sw = dw / scale; // source width to sample
+  const sh = dh / scale; // source height to sample
+
+  // Centre, then pan. offset is expressed in slot-relative units: an offset of
+  // 1 shifts the sample by one slot-width/height worth of source pixels. The
+  // sample stays clamped inside the source so we never sample out of bounds.
+  const maxSx = imgW - sw;
+  const maxSy = imgH - sh;
+  let sx = (imgW - sw) / 2 - slot.offsetX * sw;
+  let sy = (imgH - sh) / 2 - slot.offsetY * sh;
+  sx = Math.min(Math.max(sx, 0), Math.max(maxSx, 0));
+  sy = Math.min(Math.max(sy, 0), Math.max(maxSy, 0));
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(dx, dy, dw, dh);
+  ctx.clip();
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+/** True when a frame carries at least one usable slot definition. */
+function hasSlots(slots: FrameSlot[] | undefined): slots is FrameSlot[] {
+  return Array.isArray(slots) && slots.length > 0;
+}
+
+/**
+ * SLOT-BASED render path. Derives the canvas size from the loaded frame image so
+ * slots (in 0..1 units) align exactly with the artwork.
+ */
+async function compositeSlots(
   photoDataUrls: string[],
   frameSrc: string | null,
-  options: CompositeOptions = {},
+  slots: FrameSlot[],
+  options: CompositeOptions,
+): Promise<string> {
+  const { type = 'image/jpeg', quality = 0.92 } = options;
+
+  // Try to derive canvas size + overlay from the frame artwork.
+  let frame: HTMLImageElement | null = null;
+  if (frameSrc) {
+    try {
+      frame = await loadImage(frameSrc);
+    } catch {
+      frame = null;
+    }
+  }
+
+  const width = frame?.naturalWidth || SLOT_FALLBACK_WIDTH;
+  const height = frame?.naturalHeight || SLOT_FALLBACK_HEIGHT;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D tidak tersedia.');
+
+  ctx.fillStyle = BACKGROUND;
+  ctx.fillRect(0, 0, width, height);
+
+  // Decode only as many photos as there are slots.
+  const sources = photoDataUrls.slice(0, slots.length);
+  const images = await Promise.all(sources.map(loadImage));
+
+  slots.forEach((slot, index) => {
+    const img = images[index];
+    if (!img) return; // missing photo for this slot: leave background
+    const dx = slot.x * width;
+    const dy = slot.y * height;
+    const dw = slot.width * width;
+    const dh = slot.height * height;
+    drawSlotImage(ctx, img, img.width, img.height, dx, dy, dw, dh, slot);
+  });
+
+  // Overlay the frame artwork on top at its natural size.
+  if (frame) {
+    ctx.drawImage(frame, 0, 0, width, height);
+  }
+
+  return canvas.toDataURL(type, quality);
+}
+
+/**
+ * LEGACY strip render path (parametric COLS x ROWS grid on a fixed canvas).
+ * Used only for frames that have no slot definitions.
+ */
+async function compositeLegacyStrip(
+  photoDataUrls: string[],
+  frameSrc: string | null,
+  options: CompositeOptions,
 ): Promise<string> {
   const { type = 'image/jpeg', quality = 0.92 } = options;
 
@@ -104,44 +218,64 @@ export async function compositePhoto(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D tidak tersedia.');
 
-  // Opaque background (JPEG has no alpha; PNG keeps it where the frame cuts out).
   ctx.fillStyle = BACKGROUND;
   ctx.fillRect(0, 0, STRIP_WIDTH, STRIP_HEIGHT);
 
   const cols = STRIP_COLUMNS;
   const rows = STRIP_ROWS;
 
-  // Grid math (see header comment).
   const usableW = STRIP_WIDTH - 2 * PADDING - (cols - 1) * GUTTER;
   const usableH = STRIP_HEIGHT - 2 * PADDING - (rows - 1) * GUTTER;
   const cellW = usableW / cols;
   const cellH = usableH / rows;
 
-  // Decode only the photos that fit the grid.
   const capacity = cols * rows;
   const sources = photoDataUrls.slice(0, capacity);
   const images = await Promise.all(sources.map(loadImage));
 
   images.forEach((img, index) => {
-    const r = Math.floor(index / cols); // row (reading order)
-    const c = index % cols; // column
+    const r = Math.floor(index / cols);
+    const c = index % cols;
     const x = PADDING + c * (cellW + GUTTER);
     const y = PADDING + r * (cellH + GUTTER);
     drawCover(ctx, img, x, y, cellW, cellH);
   });
 
-  // Overlay the transparent frame on top, stretched to the full strip.
   if (frameSrc) {
     try {
       const frame = await loadImage(frameSrc);
       ctx.drawImage(frame, 0, 0, STRIP_WIDTH, STRIP_HEIGHT);
     } catch {
-      /* A missing/broken frame should not fail the whole composite — the
-         photos alone are still a valid result. */
+      /* A missing/broken frame should not fail the whole composite. */
     }
   }
 
   return canvas.toDataURL(type, quality);
+}
+
+/**
+ * Compose the captured photos + frame into a single image.
+ *
+ * Picks the SLOT path when `slots` is provided and non-empty, otherwise falls
+ * back to the LEGACY strip grid for backward compatibility.
+ *
+ * @param photoDataUrls Captured photo data URLs (un-mirrored). Extra photos
+ *   beyond the slot/grid capacity are ignored; missing cells stay background.
+ * @param frameSrc      Transparent frame PNG path/data URL, or null for none.
+ * @param slots         Admin-defined photo slots (0..1 units). Omit/empty for
+ *                      the legacy strip fallback.
+ * @returns             A data URL of the composited image.
+ */
+export async function compositePhoto(
+  photoDataUrls: string[],
+  frameSrc: string | null,
+  options: CompositeOptions = {},
+  slots?: FrameSlot[],
+): Promise<string> {
+  if (hasSlots(slots)) {
+    return compositeSlots(photoDataUrls, frameSrc, slots, options);
+  }
+  return compositeLegacyStrip(photoDataUrls, frameSrc, options);
 }
 
 export default compositePhoto;

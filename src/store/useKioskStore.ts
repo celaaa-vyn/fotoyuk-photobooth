@@ -222,6 +222,8 @@ export type KioskState = {
   setOperatorPin: (pin: string) => void;
   setQrisImage: (dataUrl: string | null) => void;
   addFrame: (frame: FrameAsset) => void;
+  /** Patch an existing frame in place (e.g. save edited slots) and persist. */
+  updateFrame: (frameId: string, patch: Partial<FrameAsset>) => void;
   removeFrame: (frameId: string) => void;
 
   /* ---- history / queue ---- */
@@ -294,6 +296,18 @@ export const useKioskStore = create<KioskState>((set) => ({
   addFrame: (frame) =>
     set((s) => {
       const settings = { ...s.settings, frames: [...s.settings.frames, frame] };
+      writeJSON(LS_SETTINGS, settings);
+      return { settings };
+    }),
+
+  updateFrame: (frameId, patch) =>
+    set((s) => {
+      const settings = {
+        ...s.settings,
+        frames: s.settings.frames.map((f) =>
+          f.id === frameId ? { ...f, ...patch } : f,
+        ),
+      };
       writeJSON(LS_SETTINGS, settings);
       return { settings };
     }),
