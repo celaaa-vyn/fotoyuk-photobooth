@@ -161,10 +161,12 @@ function CameraScreen() {
     setPhotos(photos);
     const photoUrls = photos.map((p) => p.dataUrl);
     try {
-      const url = await compositePhoto(photoUrls, selectedFrame?.src ?? null, {
-        type: 'image/jpeg',
-        quality: 0.92,
-      });
+      const url = await compositePhoto(
+        photoUrls,
+        selectedFrame?.src ?? null,
+        { type: 'image/jpeg', quality: 0.92 },
+        selectedFrame?.slots,
+      );
       setComposite(url);
     } catch {
       setComposite(null);
