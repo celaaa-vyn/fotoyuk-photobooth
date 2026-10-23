@@ -55,6 +55,16 @@ export default {
         'safe-l': 'env(safe-area-inset-left)',
         'safe-r': 'env(safe-area-inset-right)',
       },
+      backgroundImage: {
+        // Soft playful backdrop used on full-screen kiosk steps.
+        'kiosk-sky':
+          'linear-gradient(160deg, #eff6ff 0%, #dbeafe 45%, #fff7ed 100%)',
+      },
+      boxShadow: {
+        // Friendly raised card / button shadows.
+        card: '0 18px 40px -18px rgba(37, 99, 235, 0.35)',
+        glow: '0 10px 30px -8px rgba(37, 99, 235, 0.45)',
+      },
       keyframes: {
         'fade-in': {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
@@ -64,10 +74,22 @@ export default {
           '0%': { transform: 'scale(0.9)', opacity: '0' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
+        // Gentle slide + fade used when a flow step is remounted.
+        'step-in': {
+          '0%': { opacity: '0', transform: 'translateY(18px) scale(0.985)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        // Slow drifting background sheen for a lively but calm feel.
+        'float-slow': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.35s ease-out',
         pop: 'pop 0.25s ease-out',
+        'step-in': 'step-in 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+        'float-slow': 'float-slow 6s ease-in-out infinite',
       },
     },
   },

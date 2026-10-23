@@ -48,15 +48,15 @@ function App() {
   useWakeLock();
 
   return (
-    <div className="pad-safe flex h-full min-h-full flex-col bg-primary-50 text-primary-900">
+    <div className="pad-safe flex h-full min-h-full flex-col bg-kiosk-sky text-primary-900">
       {showProgress && (
         <header className="shrink-0 py-3">
           <ProgressBar current={step} />
         </header>
       )}
 
-      {/* Keyed wrapper replays the fade-in animation on each step change. */}
-      <main key={step} className="flex min-h-0 flex-1 flex-col">
+      {/* Keyed wrapper replays a gentle slide + fade on each step change. */}
+      <main key={step} className="flex min-h-0 flex-1 animate-step-in flex-col">
         {renderStep(step)}
       </main>
     </div>

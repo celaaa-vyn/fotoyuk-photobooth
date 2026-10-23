@@ -32,7 +32,7 @@ function PaymentScreen() {
       {/* Left: QRIS + price */}
       <div className="flex flex-col items-center gap-6">
         <h2 className="text-big text-primary-700">Scan &amp; Bayar</h2>
-        <div className="rounded-3xl bg-white p-6 shadow-xl">
+        <div className="rounded-3xl bg-white p-6 shadow-card">
           <img
             src={qrisSrc}
             alt="Kode QRIS pembayaran"

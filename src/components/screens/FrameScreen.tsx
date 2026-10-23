@@ -28,6 +28,8 @@ function FrameScreen() {
 
   const selectedFrame = frames.find((f) => f.id === selected) ?? null;
 
+  const hasFrames = frames.length > 0;
+
   useEffect(() => {
     setFrame(selected);
   }, [selected, setFrame]);
@@ -67,12 +69,32 @@ function FrameScreen() {
     };
   }, [selectedFrame, capturedPhotos, setComposite]);
 
+  // Graceful empty-frames state: if the admin removed every frame the customer
+  // flow must not crash (no frames[0] indexing). Show a friendly message and a
+  // safe path back to welcome.
+  if (!hasFrames) {
+    return (
+      <div className="animate-fade-in flex h-full flex-col items-center justify-center gap-8 px-10 text-center">
+        <div className="animate-pop flex max-w-xl flex-col gap-3 rounded-3xl bg-white/80 px-10 py-8 shadow-card backdrop-blur-sm">
+          <span className="text-6xl">🖼️</span>
+          <h2 className="text-big text-primary-700">Frame Belum Tersedia</h2>
+          <p className="text-touch text-primary-700">
+            Belum ada frame, minta admin untuk mengunggah dulu.
+          </p>
+        </div>
+        <BigButton variant="danger" onClick={reset}>
+          Batal
+        </BigButton>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in flex h-full items-center justify-center gap-10 px-10">
       {/* Live composite preview */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-big text-primary-700">Pratinjau</h2>
-        <div className="relative flex h-80 w-44 items-center justify-center overflow-hidden rounded-2xl border-4 border-primary-200 bg-white shadow-xl">
+        <div className="relative flex h-80 w-44 items-center justify-center overflow-hidden rounded-3xl border-4 border-primary-200 bg-white shadow-card">
           {previewUrl ? (
             <img
               src={previewUrl}
@@ -99,9 +121,9 @@ function FrameScreen() {
                 type="button"
                 onClick={() => setSelected(frame.id)}
                 className={[
-                  'min-h-touch flex w-32 shrink-0 flex-col items-center gap-2 rounded-2xl border-4 p-3 transition-transform active:scale-95',
+                  'min-h-touch flex w-32 shrink-0 flex-col items-center gap-2 rounded-3xl border-4 p-3 shadow-md transition-transform active:scale-95',
                   active
-                    ? 'border-primary-600 bg-primary-50'
+                    ? 'border-primary-600 bg-primary-50 shadow-glow'
                     : 'border-primary-100 bg-white',
                 ].join(' ')}
               >
