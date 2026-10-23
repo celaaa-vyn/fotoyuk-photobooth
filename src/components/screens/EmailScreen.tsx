@@ -58,8 +58,8 @@ function EmailScreen() {
     }
     if (!hasComposite) {
       // No image to send: never enqueue an empty payload. Steer the guest back
-      // to the frame step to rebuild the composite.
-      setSendError('Foto belum siap. Silakan ulangi pemilihan frame.');
+      // to the camera to retake the photos and rebuild the composite.
+      setSendError('Foto belum siap. Silakan ulangi pengambilan foto.');
       return;
     }
     const to = value.trim();
@@ -115,8 +115,8 @@ function EmailScreen() {
             Foto belum siap diproses.
           </p>
           <p className="text-base text-accent-600">
-            Hasil foto dengan frame gagal dibuat. Silakan kembali ke pemilihan
-            frame untuk mencoba lagi.
+            Hasil foto dengan frame gagal dibuat. Silakan kembali untuk
+            mengambil foto lagi.
           </p>
         </div>
       )}
@@ -178,8 +178,8 @@ function EmailScreen() {
 
       <div className="flex flex-wrap justify-center gap-4">
         {!hasComposite ? (
-          <BigButton variant="primary" onClick={() => goTo('frame')}>
-            Kembali ke Frame
+          <BigButton variant="primary" onClick={() => goTo('camera')}>
+            Kembali ke Foto
           </BigButton>
         ) : !queuedNote ? (
           <BigButton

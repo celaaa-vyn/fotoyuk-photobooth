@@ -16,9 +16,10 @@ import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import BigButton from '../ui/BigButton';
 import PinPad from '../ui/PinPad';
-import { useKioskStore } from '../../store/useKioskStore';
+import FrameEditor from '../FrameEditor';
+import { useKioskStore, defaultStripSlots } from '../../store/useKioskStore';
 import { downloadTransactionsCsv } from '../../utils/csv';
-import type { FrameAsset } from '../../types';
+import type { FrameAsset, FrameSlot } from '../../types';
 
 /** Read a File as a data URL (for QRIS / frame uploads stored in localStorage). */
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -44,6 +45,7 @@ function AdminScreen() {
   const setOperatorPin = useKioskStore((s) => s.setOperatorPin);
   const setQrisImage = useKioskStore((s) => s.setQrisImage);
   const addFrame = useKioskStore((s) => s.addFrame);
+  const updateFrame = useKioskStore((s) => s.updateFrame);
   const removeFrame = useKioskStore((s) => s.removeFrame);
   const clearTransactions = useKioskStore((s) => s.clearTransactions);
 
@@ -54,6 +56,10 @@ function AdminScreen() {
   // means no confirm panel is open. We never use window.confirm because it is
   // unreliable in iOS fullscreen / Guided Access kiosk mode.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Id of the frame whose slots are currently being edited in the visual
+  // FrameEditor overlay. Null means the editor is closed.
+  const [editingFrameId, setEditingFrameId] = useState<string | null>(null);
 
   // Local form state.
   const [priceInput, setPriceInput] = useState(String(settings.price));
@@ -122,14 +128,26 @@ function AdminScreen() {
         src: dataUrl,
         layout: 'strip-2x6',
         custom: true,
+        // Seed sensible default slots; the editor opens immediately so the
+        // admin can position them over the artwork.
+        slots: defaultStripSlots(4),
       };
       addFrame(frame);
-      setStatus('Frame ditambahkan.');
+      setStatus('Frame ditambahkan. Atur posisi slot.');
+      // Open the visual editor for the freshly uploaded frame.
+      setEditingFrameId(frame.id);
     } catch {
       setStatus('Gagal mengunggah frame.');
     } finally {
       e.target.value = '';
     }
+  };
+
+  /** Persist the slots edited in FrameEditor and close the overlay. */
+  const saveFrameSlots = (frameId: string, slots: FrameSlot[]) => {
+    updateFrame(frameId, { slots });
+    setEditingFrameId(null);
+    setStatus('Slot frame disimpan.');
   };
 
   const changePin = () => {
@@ -314,13 +332,22 @@ function AdminScreen() {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteId(frame.id)}
-                        className="min-h-touch w-full rounded-xl bg-accent-600 px-3 text-base font-bold text-white shadow-md transition-transform active:scale-95"
-                      >
-                        Hapus
-                      </button>
+                      <div className="flex w-full flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingFrameId(frame.id)}
+                          className="min-h-touch w-full rounded-xl bg-primary-600 px-3 text-base font-bold text-white shadow-md transition-transform active:scale-95"
+                        >
+                          Atur Slot
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(frame.id)}
+                          className="min-h-touch w-full rounded-xl bg-accent-600 px-3 text-base font-bold text-white shadow-md transition-transform active:scale-95"
+                        >
+                          Hapus
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -391,6 +418,23 @@ function AdminScreen() {
           </table>
         </div>
       </section>
+
+      {/* Visual slot editor overlay (Option Y). Opened on new-frame upload or
+          via "Atur Slot" on a frame card. */}
+      {(() => {
+        const editing = settings.frames.find((f) => f.id === editingFrameId);
+        if (!editing) return null;
+        return (
+          <FrameEditor
+            key={editing.id}
+            frameSrc={editing.src}
+            frameName={editing.name}
+            initialSlots={editing.slots ?? defaultStripSlots(4)}
+            onSave={(slots) => saveFrameSlots(editing.id, slots)}
+            onCancel={() => setEditingFrameId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

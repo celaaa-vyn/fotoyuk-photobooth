@@ -1,14 +1,17 @@
 /**
  * Frame screen: a swipeable/scrollable gallery of transparent frame overlays
- * from settings.frames. As the user selects a frame, a live canvas composite of
- * the four captured photos + the chosen frame is rendered via
- * utils/compositePhoto. The resulting high-quality data URL is stored so the
- * email step can send it as an attachment.
+ * from settings.frames. The customer picks a frame BEFORE taking photos, so
+ * this screen can no longer build the final composite from captured photos.
+ * Instead it shows a REPRESENTATIVE preview: the frame PNG laid over neutral
+ * placeholder slots (not real customer photos). The actual composite is built
+ * later, after capture, on the way to the email step.
+ *
+ * Choosing a frame stores it via setFrame(selectedFrameId); "Lanjut" advances
+ * to the camera, where the number of photos follows the frame's slot count.
  */
 import { useEffect, useState } from 'react';
 import BigButton from '../ui/BigButton';
 import { useKioskStore } from '../../store/useKioskStore';
-import { compositePhoto } from '../../utils/compositePhoto';
 
 function FrameScreen() {
   const goTo = useKioskStore((s) => s.goTo);
@@ -16,58 +19,23 @@ function FrameScreen() {
   const frames = useKioskStore((s) => s.settings.frames);
   const selectedFrameId = useKioskStore((s) => s.selectedFrameId);
   const setFrame = useKioskStore((s) => s.setFrame);
-  const setComposite = useKioskStore((s) => s.setComposite);
-  const capturedPhotos = useKioskStore((s) => s.capturedPhotos);
 
   // Default to the first frame if none chosen yet.
   const [selected, setSelected] = useState<string | null>(
     selectedFrameId ?? frames[0]?.id ?? null,
   );
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [building, setBuilding] = useState(false);
 
   const selectedFrame = frames.find((f) => f.id === selected) ?? null;
 
   const hasFrames = frames.length > 0;
 
+  // Number of placeholder slots shown in the preview mirrors how many photos
+  // the chosen frame will capture (slots.length), falling back to 4.
+  const previewSlotCount = selectedFrame?.slots?.length ?? 4;
+
   useEffect(() => {
     setFrame(selected);
   }, [selected, setFrame]);
-
-  // Rebuild the composite whenever the selection or photos change. The result
-  // is both previewed and stored for the email step. Guard against setting
-  // state after unmount / a newer selection via `cancelled`.
-  useEffect(() => {
-    if (capturedPhotos.length === 0) {
-      setPreviewUrl(null);
-      setComposite(null);
-      return undefined;
-    }
-    let cancelled = false;
-    setBuilding(true);
-    const photoUrls = capturedPhotos.map((p) => p.dataUrl);
-    compositePhoto(photoUrls, selectedFrame?.src ?? null, {
-      type: 'image/jpeg',
-      quality: 0.92,
-    })
-      .then((url) => {
-        if (cancelled) return;
-        setPreviewUrl(url);
-        setComposite(url);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPreviewUrl(null);
-          setComposite(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setBuilding(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFrame, capturedPhotos, setComposite]);
 
   // Graceful empty-frames state: if the admin removed every frame the customer
   // flow must not crash (no frames[0] indexing). Show a friendly message and a
@@ -91,22 +59,33 @@ function FrameScreen() {
 
   return (
     <div className="animate-fade-in flex h-full items-center justify-center gap-10 px-10">
-      {/* Live composite preview */}
+      {/* Representative preview: frame PNG over neutral placeholder slots. */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-big text-primary-700">Pratinjau</h2>
         <div className="relative flex h-80 w-44 items-center justify-center overflow-hidden rounded-3xl border-4 border-primary-200 bg-white shadow-card">
-          {previewUrl ? (
+          {/* Neutral placeholder slots (not real customer photos). */}
+          <div className="absolute inset-3 flex flex-col gap-2">
+            {Array.from({ length: previewSlotCount }).map((_, i) => (
+              <div
+                key={i}
+                className="flex flex-1 items-center justify-center rounded-lg bg-primary-100 text-base font-semibold text-primary-300"
+              >
+                {i + 1}
+              </div>
+            ))}
+          </div>
+          {/* Selected frame PNG stretched over the placeholders. */}
+          {selectedFrame && (
             <img
-              src={previewUrl}
-              alt="Pratinjau hasil"
-              className="h-full w-full object-contain"
+              src={selectedFrame.src}
+              alt={`Pratinjau frame ${selectedFrame.name}`}
+              className="absolute inset-0 h-full w-full object-contain"
             />
-          ) : (
-            <div className="flex h-full items-center justify-center text-touch text-primary-300">
-              {building ? 'Memproses…' : 'Strip foto'}
-            </div>
           )}
         </div>
+        <p className="max-w-[11rem] text-center text-base text-primary-600">
+          {previewSlotCount} foto akan diambil dengan frame ini.
+        </p>
       </div>
 
       {/* Frame gallery */}
@@ -143,8 +122,8 @@ function FrameScreen() {
         <div className="flex gap-4">
           <BigButton
             variant="primary"
-            disabled={!selected || building}
-            onClick={() => goTo('email')}
+            disabled={!selected}
+            onClick={() => goTo('camera')}
           >
             Lanjut
           </BigButton>

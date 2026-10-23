@@ -5,7 +5,8 @@
  * OPERATOR PIN (== settings.operatorPin) advances to the camera. This is a
  * SEPARATE secret from the admin PIN: the operator types it in front of guests
  * on every session, so leaking it only advances the flow and never exposes the
- * admin panel (issue 2). "Batal" returns to welcome.
+ * admin panel (issue 2). A correct PIN advances to the frame picker (the new
+ * flow picks a frame BEFORE taking photos). "Batal" returns to welcome.
  */
 import { useState } from 'react';
 import BigButton from '../ui/BigButton';
@@ -52,7 +53,7 @@ function PaymentScreen() {
             <p className="text-touch text-primary-800">Masukkan PIN operator</p>
             <PinPad
               pin={settings.operatorPin}
-              onComplete={() => goTo('camera')}
+              onComplete={() => goTo('frame')}
               onError={() => setPinError(true)}
             />
             {pinError && (
