@@ -57,29 +57,71 @@ function FrameScreen() {
     );
   }
 
+  // The slot definitions (0..1 relative units) drive WHERE each placeholder
+  // sits so the preview matches the real composite (compositePhoto) and the
+  // admin's Frame Editor. Frames WITHOUT slots (older persisted uploads) fall
+  // back to an evenly-spaced vertical strip so nothing crashes or looks empty.
+  const slots = selectedFrame?.slots ?? [];
+  const hasSlots = slots.length > 0;
+
   return (
     <div className="animate-fade-in flex h-full items-center justify-center gap-10 px-10">
-      {/* Representative preview: frame PNG over neutral placeholder slots. */}
+      {/* Representative preview: frame PNG over neutral placeholder slots that
+          follow the frame's real slot layout (absolute 0..1 positioning). */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-big text-primary-700">Pratinjau</h2>
-        <div className="relative flex h-80 w-44 items-center justify-center overflow-hidden rounded-3xl border-4 border-primary-200 bg-white shadow-card">
-          {/* Neutral placeholder slots (not real customer photos). */}
-          <div className="absolute inset-3 flex flex-col gap-2">
-            {Array.from({ length: previewSlotCount }).map((_, i) => (
-              <div
-                key={i}
-                className="flex flex-1 items-center justify-center rounded-lg bg-primary-100 text-base font-semibold text-primary-300"
-              >
-                {i + 1}
-              </div>
-            ))}
+        {/* The frame <img> defines the natural aspect ratio so the artwork is
+            never distorted; slot placeholders are overlaid in the same
+            coordinate space, selaras dengan lubang transparan pada frame. */}
+        <div className="relative max-h-[60vh] w-auto max-w-[18rem] overflow-hidden rounded-3xl border-4 border-primary-200 bg-white shadow-card">
+          {/* Neutral placeholder slots BELOW the frame overlay. */}
+          <div className="absolute inset-0">
+            {hasSlots
+              ? slots.map((slot, i) => (
+                  <div
+                    key={slot.id}
+                    className="absolute flex items-center justify-center rounded-lg bg-primary-100 text-base font-semibold text-primary-300 shadow-inner"
+                    style={{
+                      left: `${slot.x * 100}%`,
+                      top: `${slot.y * 100}%`,
+                      width: `${slot.width * 100}%`,
+                      height: `${slot.height * 100}%`,
+                    }}
+                  >
+                    {i + 1}
+                  </div>
+                ))
+              : // Fallback strip for slot-less legacy frames.
+                Array.from({ length: previewSlotCount }).map((_, i) => {
+                  const margin = 4; // percent outer margin
+                  const gutter = 3; // percent gap between slots
+                  const totalGutter = gutter * (previewSlotCount - 1);
+                  const slotHeight =
+                    (100 - margin * 2 - totalGutter) / previewSlotCount;
+                  const top = margin + i * (slotHeight + gutter);
+                  return (
+                    <div
+                      key={i}
+                      className="absolute flex items-center justify-center rounded-lg bg-primary-100 text-base font-semibold text-primary-300 shadow-inner"
+                      style={{
+                        left: `${margin}%`,
+                        top: `${top}%`,
+                        width: `${100 - margin * 2}%`,
+                        height: `${slotHeight}%`,
+                      }}
+                    >
+                      {i + 1}
+                    </div>
+                  );
+                })}
           </div>
-          {/* Selected frame PNG stretched over the placeholders. */}
+          {/* Selected frame PNG overlaid ON TOP so its transparent holes reveal
+              the placeholders beneath, menyerupai hasil composite. */}
           {selectedFrame && (
             <img
               src={selectedFrame.src}
               alt={`Pratinjau frame ${selectedFrame.name}`}
-              className="absolute inset-0 h-full w-full object-contain"
+              className="relative block max-h-[60vh] w-auto max-w-full"
             />
           )}
         </div>
