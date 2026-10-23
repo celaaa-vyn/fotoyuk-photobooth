@@ -50,6 +50,11 @@ function AdminScreen() {
   const [authed, setAuthed] = useState(false);
   const [pinError, setPinError] = useState(false);
 
+  // Id of the frame currently awaiting an on-screen delete confirmation. Null
+  // means no confirm panel is open. We never use window.confirm because it is
+  // unreliable in iOS fullscreen / Guided Access kiosk mode.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   // Local form state.
   const [priceInput, setPriceInput] = useState(String(settings.price));
   const [newPin, setNewPin] = useState('');
@@ -145,6 +150,14 @@ function AdminScreen() {
     } else {
       setStatus('PIN operator harus 4 digit angka.');
     }
+  };
+
+  const confirmRemoveFrame = (frameId: string) => {
+    // removeFrame filters settings.frames by id regardless of custom and
+    // persists via writeJSON, so default frames are removed and stay removed.
+    removeFrame(frameId);
+    setConfirmDeleteId(null);
+    setStatus('Frame dihapus.');
   };
 
   const exportCsv = () => {
@@ -258,29 +271,62 @@ function AdminScreen() {
         {/* Frames */}
         <section className="flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-md">
           <h2 className="text-touch font-bold text-primary-700">Frame</h2>
-          <div className="flex flex-wrap gap-3">
-            {settings.frames.map((frame) => (
-              <div key={frame.id} className="flex flex-col items-center gap-1">
-                <img
-                  src={frame.src}
-                  alt={frame.name}
-                  className="h-20 w-16 rounded-lg border-2 border-primary-100 object-contain"
-                />
-                <span className="max-w-16 truncate text-sm text-primary-600">
-                  {frame.name}
-                </span>
-                {frame.custom && (
-                  <button
-                    type="button"
-                    onClick={() => removeFrame(frame.id)}
-                    className="text-sm font-semibold text-accent-600"
+          {settings.frames.length === 0 ? (
+            <p className="rounded-xl bg-accent-50 px-4 py-3 text-base font-semibold text-accent-700">
+              Belum ada frame. Unggah minimal satu frame PNG agar tamu bisa
+              memilih.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              {settings.frames.map((frame) => {
+                const confirming = confirmDeleteId === frame.id;
+                return (
+                  <div
+                    key={frame.id}
+                    className="flex w-28 flex-col items-center gap-2 rounded-2xl border-2 border-primary-100 bg-primary-50/50 p-3"
                   >
-                    Hapus
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+                    <img
+                      src={frame.src}
+                      alt={frame.name}
+                      className="h-24 w-20 rounded-lg border-2 border-primary-100 bg-white object-contain"
+                    />
+                    <span className="max-w-full truncate text-sm font-semibold text-primary-600">
+                      {frame.name}
+                    </span>
+                    {confirming ? (
+                      <div className="flex w-full flex-col gap-2">
+                        <p className="text-center text-sm font-bold text-accent-700">
+                          Yakin hapus?
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => confirmRemoveFrame(frame.id)}
+                          className="min-h-touch w-full rounded-xl bg-accent-600 px-3 text-base font-bold text-white shadow-md transition-transform active:scale-95"
+                        >
+                          Ya, hapus
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="min-h-touch w-full rounded-xl border-2 border-primary-200 bg-white px-3 text-base font-bold text-primary-700 shadow-sm transition-transform active:scale-95"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(frame.id)}
+                        className="min-h-touch w-full rounded-xl bg-accent-600 px-3 text-base font-bold text-white shadow-md transition-transform active:scale-95"
+                      >
+                        Hapus
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <label className="min-h-touch inline-flex cursor-pointer items-center justify-center rounded-2xl bg-primary-600 px-6 text-touch font-bold text-white shadow-lg active:scale-95">
             Unggah Frame PNG
             <input

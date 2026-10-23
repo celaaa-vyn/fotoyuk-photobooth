@@ -22,6 +22,31 @@ export type CapturedPhoto = {
   takenAt: number;
 };
 
+/**
+ * One photo area ("slot") inside a frame, described in RESOLUTION-INDEPENDENT
+ * relative units in the range 0..1 so a frame definition is independent of the
+ * final export pixel size. A frame carries an ordered list of these slots; the
+ * first captured photo fills slot[0], the second fills slot[1], and so on.
+ */
+export type FrameSlot = {
+  /** Stable identifier for this slot (e.g. 'slot-0'). */
+  id: string;
+  /** Slot top-left X as a fraction of the frame canvas width (0..1). */
+  x: number;
+  /** Slot top-left Y as a fraction of the frame canvas height (0..1). */
+  y: number;
+  /** Slot width as a fraction of the frame canvas width (0..1). */
+  width: number;
+  /** Slot height as a fraction of the frame canvas height (0..1). */
+  height: number;
+  /** Photo scale multiplier inside the slot (>= 1 typical, default 1). */
+  zoom: number;
+  /** Photo horizontal pan inside the slot, in slot-relative units (default 0). */
+  offsetX: number;
+  /** Photo vertical pan inside the slot, in slot-relative units (default 0). */
+  offsetY: number;
+};
+
 /** A selectable frame overlay (transparent PNG) from the gallery. */
 export type FrameAsset = {
   id: string;
@@ -32,6 +57,13 @@ export type FrameAsset = {
   layout: 'strip-2x6';
   /** Whether this frame was uploaded via admin (stored in localStorage). */
   custom?: boolean;
+  /**
+   * Optional photo-area definitions in relative 0..1 units. Frames WITHOUT
+   * slots (e.g. older persisted uploads) fall back to the legacy strip grid
+   * in compositePhoto, so this field is purely additive and backward
+   * compatible.
+   */
+  slots?: FrameSlot[];
 };
 
 /** Delivery status of a photobooth session's final email. */

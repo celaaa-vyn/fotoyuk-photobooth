@@ -15,11 +15,57 @@ import { create } from 'zustand';
 import type {
   CapturedPhoto,
   FrameAsset,
+  FrameSlot,
   KioskStep,
   QueuedEmail,
   Settings,
   Transaction,
 } from '../types';
+
+/**
+ * Generate `count` evenly-spaced vertical slots (single column) that mirror the
+ * legacy strip layout proportions in compositePhoto (STRIP 1200x3600, uniform
+ * PADDING=48, GUTTER=36, 1 column x N rows). The pixel margins are converted to
+ * resolution-independent 0..1 fractions of the strip so the slots stay valid at
+ * any export size:
+ *
+ *   marginX = PADDING / STRIP_WIDTH   (uniform left/right outer margin)
+ *   marginY = PADDING / STRIP_HEIGHT  (uniform top/bottom outer margin)
+ *   gutterY = GUTTER  / STRIP_HEIGHT  (gap between stacked slots)
+ *
+ * Each slot spans the full width minus the two side margins, and the usable
+ * height (minus top/bottom margins and the inter-slot gutters) is divided
+ * evenly across `count` rows. Every slot starts neutral: zoom=1, offsetX=0,
+ * offsetY=0.
+ */
+export function defaultStripSlots(count: number): FrameSlot[] {
+  if (count <= 0) return [];
+
+  // Match compositePhoto's STRIP_WIDTH/STRIP_HEIGHT/PADDING/GUTTER proportions.
+  const STRIP_WIDTH = 1200;
+  const STRIP_HEIGHT = 3600;
+  const PADDING = 48;
+  const GUTTER = 36;
+
+  const marginX = PADDING / STRIP_WIDTH;
+  const marginY = PADDING / STRIP_HEIGHT;
+  const gutterY = GUTTER / STRIP_HEIGHT;
+
+  const slotWidth = 1 - 2 * marginX;
+  const usableHeight = 1 - 2 * marginY - (count - 1) * gutterY;
+  const slotHeight = usableHeight / count;
+
+  return Array.from({ length: count }, (_, i) => ({
+    id: `slot-${i}`,
+    x: marginX,
+    y: marginY + i * (slotHeight + gutterY),
+    width: slotWidth,
+    height: slotHeight,
+    zoom: 1,
+    offsetX: 0,
+    offsetY: 0,
+  }));
+}
 
 /* localStorage keys. Namespaced so they don't collide with other apps. */
 const LS_SETTINGS = 'pbk.settings';
@@ -36,9 +82,27 @@ const MAX_QUEUE_LENGTH = 8;
 
 /** Default frames seeded from the public/frames gallery (placeholder PNGs). */
 const DEFAULT_FRAMES: FrameAsset[] = [
-  { id: 'frame-classic', name: 'Classic', src: '/frames/frame-classic.png', layout: 'strip-2x6' },
-  { id: 'frame-party', name: 'Party', src: '/frames/frame-party.png', layout: 'strip-2x6' },
-  { id: 'frame-polaroid', name: 'Polaroid', src: '/frames/frame-polaroid.png', layout: 'strip-2x6' },
+  {
+    id: 'frame-classic',
+    name: 'Classic',
+    src: '/frames/frame-classic.png',
+    layout: 'strip-2x6',
+    slots: defaultStripSlots(4),
+  },
+  {
+    id: 'frame-party',
+    name: 'Party',
+    src: '/frames/frame-party.png',
+    layout: 'strip-2x6',
+    slots: defaultStripSlots(4),
+  },
+  {
+    id: 'frame-polaroid',
+    name: 'Polaroid',
+    src: '/frames/frame-polaroid.png',
+    layout: 'strip-2x6',
+    slots: defaultStripSlots(4),
+  },
 ];
 
 /** Parse the env price into a safe positive integer, falling back to 25000. */
