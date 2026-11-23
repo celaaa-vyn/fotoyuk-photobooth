@@ -341,11 +341,17 @@ function FrameEditor({ frameSrc, frameName, initialSlots, onSave, onCancel }: Pr
               className="relative mx-auto w-full max-w-[18rem] touch-none select-none overflow-hidden rounded-2xl border-4 border-primary-200 bg-primary-50"
               style={{ aspectRatio: String(aspect) }}
             >
-              {/* Frame artwork backdrop (dimmed so slots read clearly). */}
+              {/* Frame artwork backdrop (dimmed so slots read clearly).
+                  object-fill (not object-contain) so the artwork fills the
+                  exact same aspect-ratio box the slot rectangles are positioned
+                  against: no letterbox bars means the editor matches
+                  SlotFrameView and compositePhoto for every slot, including the
+                  edge ones. The box ratio already equals the image ratio so a
+                  full fill does not distort. */}
               <img
                 src={frameSrc}
                 alt={`Backdrop frame ${frameName}`}
-                className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-60"
+                className="pointer-events-none absolute inset-0 h-full w-full object-fill opacity-60"
                 draggable={false}
               />
               {slots.map((slot, i) => {

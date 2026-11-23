@@ -7,9 +7,11 @@
  *   supported by the device/browser.
  * - The live <video> preview is mirrored in the UI via CSS `transform:
  *   scaleX(-1)` (handled by the component), which feels natural to the user.
- * - CRITICAL: capture() draws the current video frame UN-mirrored onto an
- *   offscreen canvas. We never apply a horizontal flip when capturing, so any
- *   text printed later onto the frame reads correctly in the saved image.
+ * - CRITICAL: capture() draws the current video frame MIRRORED onto an
+ *   offscreen canvas (horizontal flip) so the SAVED photo matches exactly what
+ *   the user sees in the mirrored live preview. The frame artwork is a separate
+ *   overlay drawn AFTER the photo in compositePhoto, so mirroring the photo
+ *   does not affect frame text legibility (the overlay is never mirrored).
  * - Permission-denied (and other) errors are surfaced via `error`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -36,7 +38,8 @@ export type UseCameraResult = {
   /** Stop all tracks and release the camera. */
   stop: () => void;
   /**
-   * Grab the current video frame UN-MIRRORED as a data URL. Returns null if the
+   * Grab the current video frame MIRRORED (horizontal flip) as a data URL, so
+   * the saved photo matches the mirrored live preview. Returns null if the
    * stream is not ready. `type`/`quality` let callers trade size vs fidelity.
    */
   capture: (type?: 'image/jpeg' | 'image/png', quality?: number) => string | null;
@@ -150,9 +153,11 @@ export function useCamera(): UseCameraResult {
   }, []);
 
   /**
-   * Draw the current frame to an offscreen canvas WITHOUT mirroring and return
-   * a data URL. We intentionally do NOT flip the context horizontally here so
-   * the saved pixels are un-mirrored and frame text reads correctly.
+   * Draw the current frame to an offscreen canvas MIRRORED (horizontal flip)
+   * and return a data URL. We flip the context horizontally so the saved pixels
+   * match exactly what the user sees in the mirrored live preview (the preview
+   * uses CSS scaleX(-1)). The frame overlay is drawn separately and is never
+   * mirrored, so frame text still reads correctly.
    */
   const capture = useCallback(
     (type: 'image/jpeg' | 'image/png' = 'image/jpeg', quality = 0.95): string | null => {
@@ -169,7 +174,11 @@ export function useCamera(): UseCameraResult {
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
-      // No ctx.scale(-1, 1): draw the frame exactly as the camera sees it.
+      // Mirror horizontally so the saved photo matches the mirrored live
+      // preview (which uses CSS scaleX(-1)). Flip the canvas X axis before
+      // drawing: translate to the right edge, then scale X by -1.
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, width, height);
       return canvas.toDataURL(type, quality);
     },

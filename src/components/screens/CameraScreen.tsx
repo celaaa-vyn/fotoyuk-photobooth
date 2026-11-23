@@ -17,8 +17,10 @@
  * matches where the shot will land in the strip.
  *
  * Mirroring rule (authoritative): the live <video> preview is mirrored via CSS
- * `transform: scaleX(-1)` so it feels natural, but useCamera.capture() grabs
- * UN-mirrored pixels so text printed on frames reads correctly.
+ * `transform: scaleX(-1)` so it feels natural, and useCamera.capture() also
+ * mirrors the captured pixels so the SAVED photo matches exactly what the user
+ * saw in the preview. The frame artwork is a separate overlay drawn after the
+ * photo, so it is never mirrored and its text still reads correctly.
  *
  * Error handling: if the camera is denied/unavailable, the user sees clear
  * instructions for enabling it in Safari plus retry and back-to-welcome paths.
@@ -99,8 +101,8 @@ function CameraScreen() {
   }, [start, stop]);
 
   /**
-   * Grab one un-mirrored frame and store it at `index`, replacing any existing
-   * photo at that slot (used for retakes).
+   * Grab one mirrored frame (matching the live preview) and store it at
+   * `index`, replacing any existing photo at that slot (used for retakes).
    */
   const takeShot = useCallback(
     (index: number) => {
@@ -245,8 +247,9 @@ function CameraScreen() {
             className="relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-3xl bg-primary-900 shadow-xl"
             style={{ aspectRatio: previewAspect, height: '100%' }}
           >
-            {/* Mirrored live preview; captured frames stay un-mirrored. The
-                video is object-cover so it crops to the slot ratio instead of
+            {/* Mirrored live preview; captured frames are mirrored too (in
+                useCamera.capture) so they match this preview. The video is
+                object-cover so it crops to the slot ratio instead of
                 distorting. */}
             <video
               ref={videoRef}

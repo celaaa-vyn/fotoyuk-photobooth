@@ -9,8 +9,9 @@
  * admin-defined zoom + offset, approximating drawSlotImage) or a numbered
  * placeholder.
  *
- * Captured photos are already UN-mirrored (useCamera.capture un-mirrors), so no
- * CSS flip is applied here.
+ * Captured photos are already mirrored once by useCamera.capture (to match the
+ * live preview), so NO additional CSS flip is applied here (that would
+ * double-mirror them).
  */
 import type { CapturedPhoto, FrameAsset } from '../../types';
 import SlotFrameView from './SlotFrameView';

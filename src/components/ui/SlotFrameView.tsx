@@ -16,9 +16,16 @@
  *   - The coordinate box (`stageClassName`) has `aspectRatio` = the frame
  *     image's natural width/height. Because the box ratio equals the image
  *     ratio, the image fills it with NO letterboxing.
- *   - The frame image is positioned `inset-0 h-full w-full object-contain`
- *     inside that box (object-contain, like the editor backdrop, so sub-pixel
- *     rounding of the aspect-ratio box never stretches the artwork).
+ *   - The frame image is positioned `inset-0 h-full w-full object-fill`
+ *     inside that box. It FILLS the box completely (no object-contain), so the
+ *     artwork and the slots share the exact same coordinate box with no
+ *     letterbox bars. Because the box ratio already equals the image ratio,
+ *     a full fill does not distort the artwork. (object-contain used to add
+ *     letterbox bars whenever the aspect-ratio box rounded to a slightly
+ *     different ratio than the image, which shifted/shrank the artwork
+ *     relative to the slots and was most visible on the EDGE slots. Filling
+ *     the box removes that mismatch so every slot, including the first and
+ *     last, lines up with compositePhoto.)
  *   - Each slot is positioned `absolute` with left/top/width/height =
  *     slot.(x,y,width,height) * 100% of that SAME box.
  *   - Any decorative border/rounding/shadow also lives on this box, but a
@@ -155,7 +162,7 @@ function SlotFrameView({
         <img
           src={frame.src}
           alt={`Frame ${frame.name}`}
-          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+          className="pointer-events-none absolute inset-0 h-full w-full object-fill"
           draggable={false}
         />
       )}
