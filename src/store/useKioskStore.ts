@@ -112,6 +112,31 @@ function defaultPrice(): number {
   return Number.isFinite(n) && n > 0 ? n : 25000;
 }
 
+/**
+ * Default AUTO-send destination. While the Resend domain is unverified only the
+ * Resend account owner's address can receive mail, so the fallback is that
+ * address. Overridable via VITE_AUTO_SEND_EMAIL.
+ */
+function defaultAutoSendEmail(): string {
+  const raw = import.meta.env.VITE_AUTO_SEND_EMAIL;
+  return typeof raw === 'string' && raw.trim().length > 0
+    ? raw.trim()
+    : 'kellvin1793@gmail.com';
+}
+
+/**
+ * Default AUTO-send toggle. Defaults to true (AUTO: send straight to the fixed
+ * address, skip the email form). Overridable via VITE_AUTO_SEND_ENABLED
+ * ('false'/'0' disables it).
+ */
+function defaultAutoSendEnabled(): boolean {
+  const raw = import.meta.env.VITE_AUTO_SEND_ENABLED;
+  if (typeof raw !== 'string') return true;
+  const v = raw.trim().toLowerCase();
+  if (v === 'false' || v === '0' || v === 'no') return false;
+  return true;
+}
+
 /** Base settings from env before localStorage overrides are applied. */
 function envSettings(): Settings {
   return {
@@ -120,6 +145,8 @@ function envSettings(): Settings {
     operatorPin: import.meta.env.VITE_DEFAULT_OPERATOR_PIN ?? '2802',
     qrisImage: null,
     senderEmail: import.meta.env.VITE_SENDER_EMAIL ?? 'onboarding@resend.dev',
+    autoSendEnabled: defaultAutoSendEnabled(),
+    autoSendEmail: defaultAutoSendEmail(),
     frames: DEFAULT_FRAMES,
   };
 }
@@ -169,6 +196,17 @@ function hydrateSettings(): Settings {
       typeof stored.operatorPin === 'string' && stored.operatorPin.length > 0
         ? stored.operatorPin
         : base.operatorPin,
+    // Backfill the email-delivery mode fields for settings persisted before
+    // they existed: keep any stored boolean, otherwise fall back to the env
+    // default (AUTO on). Likewise backfill the fixed destination address.
+    autoSendEnabled:
+      typeof stored.autoSendEnabled === 'boolean'
+        ? stored.autoSendEnabled
+        : base.autoSendEnabled,
+    autoSendEmail:
+      typeof stored.autoSendEmail === 'string' && stored.autoSendEmail.length > 0
+        ? stored.autoSendEmail
+        : base.autoSendEmail,
   };
 }
 
@@ -221,6 +259,10 @@ export type KioskState = {
   setAdminPin: (pin: string) => void;
   setOperatorPin: (pin: string) => void;
   setQrisImage: (dataUrl: string | null) => void;
+  /** Toggle AUTO vs MANUAL email sending (persisted). */
+  setAutoSendEnabled: (enabled: boolean) => void;
+  /** Set the fixed AUTO-mode destination address (persisted). */
+  setAutoSendEmail: (email: string) => void;
   addFrame: (frame: FrameAsset) => void;
   /** Patch an existing frame in place (e.g. save edited slots) and persist. */
   updateFrame: (frameId: string, patch: Partial<FrameAsset>) => void;
@@ -289,6 +331,20 @@ export const useKioskStore = create<KioskState>((set) => ({
   setQrisImage: (qrisImage) =>
     set((s) => {
       const settings = { ...s.settings, qrisImage };
+      writeJSON(LS_SETTINGS, settings);
+      return { settings };
+    }),
+
+  setAutoSendEnabled: (autoSendEnabled) =>
+    set((s) => {
+      const settings = { ...s.settings, autoSendEnabled };
+      writeJSON(LS_SETTINGS, settings);
+      return { settings };
+    }),
+
+  setAutoSendEmail: (autoSendEmail) =>
+    set((s) => {
+      const settings = { ...s.settings, autoSendEmail };
       writeJSON(LS_SETTINGS, settings);
       return { settings };
     }),

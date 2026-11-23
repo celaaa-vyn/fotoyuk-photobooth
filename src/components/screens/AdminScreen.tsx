@@ -36,6 +36,9 @@ function formatRupiah(amount: number): string {
   return `Rp ${amount.toLocaleString('id-ID')}`;
 }
 
+/** Pragmatic email format check, matching the email screen's validation. */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function AdminScreen() {
   const reset = useKioskStore((s) => s.reset);
   const settings = useKioskStore((s) => s.settings);
@@ -44,6 +47,8 @@ function AdminScreen() {
   const setAdminPin = useKioskStore((s) => s.setAdminPin);
   const setOperatorPin = useKioskStore((s) => s.setOperatorPin);
   const setQrisImage = useKioskStore((s) => s.setQrisImage);
+  const setAutoSendEnabled = useKioskStore((s) => s.setAutoSendEnabled);
+  const setAutoSendEmail = useKioskStore((s) => s.setAutoSendEmail);
   const addFrame = useKioskStore((s) => s.addFrame);
   const updateFrame = useKioskStore((s) => s.updateFrame);
   const removeFrame = useKioskStore((s) => s.removeFrame);
@@ -65,6 +70,7 @@ function AdminScreen() {
   const [priceInput, setPriceInput] = useState(String(settings.price));
   const [newPin, setNewPin] = useState('');
   const [newOperatorPin, setNewOperatorPin] = useState('');
+  const [autoEmailInput, setAutoEmailInput] = useState(settings.autoSendEmail);
   const [status, setStatus] = useState<string | null>(null);
 
   // --- PIN gate ----------------------------------------------------------
@@ -148,6 +154,26 @@ function AdminScreen() {
     updateFrame(frameId, { slots });
     setEditingFrameId(null);
     setStatus('Slot frame disimpan.');
+  };
+
+  const toggleAutoSend = () => {
+    const next = !settings.autoSendEnabled;
+    setAutoSendEnabled(next);
+    setStatus(
+      next
+        ? 'Mode kirim otomatis aktif. Tamu tidak perlu mengetik email.'
+        : 'Mode manual aktif. Tamu mengetik email sendiri.',
+    );
+  };
+
+  const saveAutoSendEmail = () => {
+    const email = autoEmailInput.trim();
+    if (!EMAIL_REGEX.test(email)) {
+      setStatus('Email tujuan tidak valid.');
+      return;
+    }
+    setAutoSendEmail(email);
+    setStatus('Email tujuan disimpan.');
   };
 
   const changePin = () => {
@@ -284,6 +310,76 @@ function AdminScreen() {
               onChange={onQrisChange}
             />
           </label>
+        </section>
+
+        {/* Email delivery mode */}
+        <section className="flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-md">
+          <h2 className="text-touch font-bold text-primary-700">
+            Pengiriman Email
+          </h2>
+          <p className="text-base text-primary-600">
+            Otomatis: hasil foto langsung dikirim ke satu email tetap tanpa tamu
+            mengetik. Manual: tamu mengetik emailnya sendiri.
+          </p>
+
+          {/* ON/OFF toggle. Big touch target, playful colours. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.autoSendEnabled}
+            onClick={toggleAutoSend}
+            className={[
+              'min-h-touch flex w-full items-center justify-between rounded-2xl border-2 px-5 text-touch font-bold shadow-sm transition-colors active:scale-95',
+              settings.autoSendEnabled
+                ? 'border-primary-500 bg-primary-50 text-primary-700'
+                : 'border-primary-200 bg-white text-primary-500',
+            ].join(' ')}
+          >
+            <span>
+              {settings.autoSendEnabled ? 'Kirim Otomatis: AKTIF' : 'Kirim Otomatis: MATI'}
+            </span>
+            <span
+              className={[
+                'relative h-9 w-16 shrink-0 rounded-full transition-colors',
+                settings.autoSendEnabled ? 'bg-primary-500' : 'bg-primary-200',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'absolute top-1 h-7 w-7 rounded-full bg-white shadow transition-all',
+                  settings.autoSendEnabled ? 'left-8' : 'left-1',
+                ].join(' ')}
+              />
+            </span>
+          </button>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-base font-semibold text-primary-600">
+              Email tujuan (mode otomatis)
+            </label>
+            <div className="flex gap-3">
+              <input
+                type="email"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="nama@email.com"
+                value={autoEmailInput}
+                onChange={(e) => setAutoEmailInput(e.target.value)}
+                className="min-h-touch w-full rounded-xl border-2 border-primary-200 px-4 text-touch focus:border-primary-500 focus:outline-none"
+              />
+              <BigButton variant="primary" onClick={saveAutoSendEmail}>
+                Simpan
+              </BigButton>
+            </div>
+            <p className="text-base text-primary-600">
+              Aktif sekarang: {settings.autoSendEmail}
+            </p>
+            <p className="rounded-xl bg-primary-50 px-3 py-2 text-sm text-primary-500">
+              Catatan: selama domain Resend belum diverifikasi, email hanya
+              terkirim ke alamat pemilik akun Resend.
+            </p>
+          </div>
         </section>
 
         {/* Frames */}
