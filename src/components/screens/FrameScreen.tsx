@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import BigButton from '../ui/BigButton';
+import SlotFrameView from '../ui/SlotFrameView';
 import { useKioskStore } from '../../store/useKioskStore';
 
 function FrameScreen() {
@@ -57,74 +58,24 @@ function FrameScreen() {
     );
   }
 
-  // The slot definitions (0..1 relative units) drive WHERE each placeholder
-  // sits so the preview matches the real composite (compositePhoto) and the
-  // admin's Frame Editor. Frames WITHOUT slots (older persisted uploads) fall
-  // back to an evenly-spaced vertical strip so nothing crashes or looks empty.
-  const slots = selectedFrame?.slots ?? [];
-  const hasSlots = slots.length > 0;
-
   return (
     <div className="animate-fade-in flex h-full items-center justify-center gap-10 px-10">
       {/* Representative preview: frame PNG over neutral placeholder slots that
-          follow the frame's real slot layout (absolute 0..1 positioning). */}
+          follow the frame's real slot layout. SlotFrameView is the SAME render
+          path used by the Frame Editor and the camera StripPreview, so the slot
+          positions here are identical to the editor and the final composite. */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-big text-primary-700">Pratinjau</h2>
-        {/* The frame <img> defines the natural aspect ratio so the artwork is
-            never distorted; slot placeholders are overlaid in the same
-            coordinate space, selaras dengan lubang transparan pada frame. */}
-        <div className="relative max-h-[60vh] w-auto max-w-[18rem] overflow-hidden rounded-3xl border-4 border-primary-200 bg-white shadow-card">
-          {/* Neutral placeholder slots BELOW the frame overlay. */}
-          <div className="absolute inset-0">
-            {hasSlots
-              ? slots.map((slot, i) => (
-                  <div
-                    key={slot.id}
-                    className="absolute flex items-center justify-center rounded-lg bg-primary-100 text-base font-semibold text-primary-300 shadow-inner"
-                    style={{
-                      left: `${slot.x * 100}%`,
-                      top: `${slot.y * 100}%`,
-                      width: `${slot.width * 100}%`,
-                      height: `${slot.height * 100}%`,
-                    }}
-                  >
-                    {i + 1}
-                  </div>
-                ))
-              : // Fallback strip for slot-less legacy frames.
-                Array.from({ length: previewSlotCount }).map((_, i) => {
-                  const margin = 4; // percent outer margin
-                  const gutter = 3; // percent gap between slots
-                  const totalGutter = gutter * (previewSlotCount - 1);
-                  const slotHeight =
-                    (100 - margin * 2 - totalGutter) / previewSlotCount;
-                  const top = margin + i * (slotHeight + gutter);
-                  return (
-                    <div
-                      key={i}
-                      className="absolute flex items-center justify-center rounded-lg bg-primary-100 text-base font-semibold text-primary-300 shadow-inner"
-                      style={{
-                        left: `${margin}%`,
-                        top: `${top}%`,
-                        width: `${100 - margin * 2}%`,
-                        height: `${slotHeight}%`,
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                  );
-                })}
-          </div>
-          {/* Selected frame PNG overlaid ON TOP so its transparent holes reveal
-              the placeholders beneath, menyerupai hasil composite. */}
-          {selectedFrame && (
-            <img
-              src={selectedFrame.src}
-              alt={`Pratinjau frame ${selectedFrame.name}`}
-              className="relative block max-h-[60vh] w-auto max-w-full"
-            />
+        <SlotFrameView
+          frame={selectedFrame}
+          fallbackCount={previewSlotCount}
+          stageClassName="max-h-[60vh] w-auto max-w-[18rem] rounded-3xl border-4 border-primary-200 bg-white shadow-card"
+          renderSlot={(i) => (
+            <div className="flex h-full w-full items-center justify-center bg-primary-100 text-base font-semibold text-primary-300 shadow-inner">
+              {i + 1}
+            </div>
           )}
-        </div>
+        />
         <p className="max-w-[11rem] text-center text-base text-primary-600">
           {previewSlotCount} foto akan diambil dengan frame ini.
         </p>
