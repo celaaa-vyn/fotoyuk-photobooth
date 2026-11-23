@@ -1,12 +1,18 @@
 /**
- * Preview screen: the final confirmation step between the camera and the email
- * step. It shows the finished composite (captured photos + frame) large and
- * centred so the customer can see exactly what will be emailed. "Lanjut"
- * proceeds to the email step; "Batal" resets the whole session back to welcome.
+ * Preview screen: the final confirmation step before finishing. It shows the
+ * finished composite (captured photos + frame) large and centred so the
+ * customer can see exactly what will be printed. "Lanjut" finishes the session;
+ * "Batal" resets the whole session back to welcome.
+ *
+ * Because the result is a HARDCOPY, the customer never types or sees an email
+ * step. In AUTO mode "Lanjut" hands off to the (invisible) email step, which
+ * sends the photo silently to the fixed address so the operator can print it,
+ * then lands on the "Fotomu sedang diproses" thank-you screen. In MANUAL mode
+ * the original email form still appears. The copy here stays email-neutral.
  *
  * The composite is built once in CameraScreen and stored as compositeDataUrl;
- * this screen (and EmailScreen afterwards) simply read that same image, so no
- * recomputation happens here and the emailed image always matches the preview.
+ * this screen (and the send path afterwards) simply read that same image, so no
+ * recomputation happens here and the delivered image always matches the preview.
  *
  * Safety: if the composite is missing (compositing failed), the customer is not
  * stranded. We show a friendly notice and offer a path back to the camera to
@@ -49,7 +55,7 @@ function PreviewScreen() {
     <div className="animate-fade-in flex h-full flex-col items-center gap-6 px-8 py-4">
       <h2 className="text-big text-primary-700">Pratinjau Hasil</h2>
       <p className="text-touch max-w-2xl text-center text-primary-700">
-        Ini hasil foto kamu. Kalau sudah oke, lanjut untuk mengirim ke email.
+        Ini hasil foto kamu. Kalau sudah oke, tekan Lanjut.
       </p>
 
       {/* Large centred composite result. */}

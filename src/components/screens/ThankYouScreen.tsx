@@ -2,6 +2,12 @@
  * Thank-you screen: closes the session with a cheerful message. It auto-resets
  * back to welcome after 10 seconds (so the kiosk is ready for the next user)
  * and also offers a manual "Selesai" button.
+ *
+ * The result is a HARDCOPY: the operator receives the emailed photo and prints
+ * it, so the customer is never told anything about email. The main message is
+ * always "Fotomu sedang diproses". If this session's send was only queued
+ * (offline), a small, email-neutral hint reassures that processing may take a
+ * little longer, without exposing the delivery mechanism.
  */
 import { useEffect, useState } from 'react';
 import BigButton from '../ui/BigButton';
@@ -15,14 +21,6 @@ function ThankYouScreen() {
   const emailOutcome = useKioskStore((s) => s.emailOutcome);
   const [remaining, setRemaining] = useState(AUTO_RESET_SECONDS);
 
-  // Reflect the real delivery state (issue 4): only claim the photo is on its
-  // way when it was actually sent; if it was queued offline/after a failure,
-  // say so instead of overstating delivery.
-  const message =
-    emailOutcome === 'queued'
-      ? 'Foto kamu masuk antrean dan akan dikirim otomatis saat internet kembali.'
-      : 'Foto kamu sedang dikirim ke email.';
-
   useEffect(() => {
     if (remaining <= 0) {
       reset();
@@ -35,7 +33,13 @@ function ThankYouScreen() {
   return (
     <div className="animate-fade-in flex h-full flex-col items-center justify-center gap-8 px-10 text-center">
       <h1 className="text-huge text-primary-600">Terima Kasih! 🎉</h1>
-      <p className="text-big text-primary-800">{message}</p>
+      <p className="text-big text-primary-800">Fotomu sedang diproses</p>
+      <p className="text-touch text-primary-700">Silakan tunggu hasil cetaknya ya.</p>
+      {emailOutcome === 'queued' && (
+        <p className="text-base text-primary-500">
+          Prosesnya mungkin butuh waktu sedikit lebih lama.
+        </p>
+      )}
       <p className="text-touch text-primary-600">
         Kembali ke awal dalam {remaining} detik…
       </p>
