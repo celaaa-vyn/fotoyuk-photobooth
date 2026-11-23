@@ -4,12 +4,18 @@
  * the offline email queue, and admin-configurable settings.
  */
 
-/** The six mandatory flow steps, plus the PIN-protected admin screen. */
+/**
+ * The mandatory flow steps, plus the PIN-protected admin screen. The customer
+ * flow runs welcome -> payment -> frame -> camera -> preview -> email ->
+ * thankyou. The 'preview' step shows the finished composite (photos + frame)
+ * before the email step so the customer can confirm it.
+ */
 export type KioskStep =
   | 'welcome'
   | 'payment'
   | 'camera'
   | 'frame'
+  | 'preview'
   | 'email'
   | 'thankyou'
   | 'admin';
