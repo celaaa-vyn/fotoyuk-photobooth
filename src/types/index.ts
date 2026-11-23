@@ -123,6 +123,19 @@ export type Settings = {
   qrisImage: string | null;
   /** Sender email used by the Resend serverless function. */
   senderEmail: string;
+  /**
+   * When true, the kiosk runs in AUTO send mode: the finished photo is sent
+   * straight to the fixed `autoSendEmail` address and the customer never types
+   * an email (the email form is skipped). When false it runs in MANUAL mode:
+   * the customer types their own address on the email screen as before.
+   */
+  autoSendEnabled: boolean;
+  /**
+   * Fixed destination address used in AUTO mode. While the Resend domain is not
+   * yet verified this must be the owner's own Resend account address, since
+   * Resend only delivers to that address until a domain is verified.
+   */
+  autoSendEmail: string;
   /** Frame overlays available in the gallery (seeded + admin uploads). */
   frames: FrameAsset[];
 };
