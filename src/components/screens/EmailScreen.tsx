@@ -6,8 +6,11 @@
  *
  *  - AUTO  : the finished photo is sent straight to the fixed
  *            settings.autoSendEmail address. No form is shown, no typing is
- *            required; the screen shows a "mengirim..." state, then the result,
- *            and advances to thank-you automatically.
+ *            required. Because the result is a HARDCOPY (the operator picks up
+ *            the emailed file and prints it), the customer never sees an email
+ *            step: the send fires silently in the background (offline-tolerant
+ *            queue) and we advance to thank-you ("Fotomu sedang diproses")
+ *            immediately so it feels like preview -> done.
  *  - MANUAL: the customer types their own email (type=email + inputMode=email +
  *            autoFocus so the iPad keyboard pops up) and taps "Kirim". This is
  *            the original behaviour, unchanged.
@@ -63,11 +66,14 @@ function EmailScreen() {
 
   /**
    * Shared send path for both AUTO and MANUAL. Records the transaction, sends
-   * (or queues) the composite, sets emailOutcome, and advances to thank-you on
-   * immediate success. Returns nothing; callers react to the state it sets.
+   * (or queues) the composite, and sets emailOutcome. By default it advances to
+   * thank-you on immediate success (MANUAL behaviour). When `navigateOnSuccess`
+   * is false (AUTO hardcopy mode) it does NOT navigate: the caller has already
+   * moved the customer to thank-you, so the send simply runs in the background
+   * and its result only updates the recorded outcome/transaction.
    */
   const runSend = useCallback(
-    async (to: string) => {
+    async (to: string, { navigateOnSuccess = true } = {}) => {
       setEmail(to);
       setSending(true);
       setSendError(null);
@@ -98,10 +104,12 @@ function EmailScreen() {
 
       if (result.sent) {
         setEmailOutcome('sent');
-        goTo('thankyou');
+        if (navigateOnSuccess) goTo('thankyou');
         return;
       }
-      // Queued (offline or failed): tell the user, offer resend + continue.
+      // Queued (offline or failed): record the outcome. In MANUAL mode we also
+      // surface the queued note + resend UI; in AUTO mode the customer has
+      // already advanced, so the queue just retries silently.
       setEmailOutcome('queued');
       setQueuedNote(true);
       setSendError(result.error ?? null);
@@ -133,93 +141,37 @@ function EmailScreen() {
     await runSend(value.trim());
   };
 
-  // AUTO mode: fire the send exactly once on mount when a composite is ready.
-  // A ref guards against the effect re-running (e.g. under React strict mode)
-  // so we never double-send or create duplicate transactions.
+  // AUTO (hardcopy) mode: the customer must not see an email step at all. On
+  // mount, fire the send ONCE in the background (offline-tolerant queue records
+  // the transaction + sets emailOutcome and retries on its own) and immediately
+  // advance to thank-you, so the flow feels like preview -> selesai. A ref
+  // guards against the effect re-running (e.g. React strict mode) so we never
+  // double-send or create duplicate transactions.
   const autoFiredRef = useRef(false);
   useEffect(() => {
     if (!autoSend) return;
     if (autoFiredRef.current) return;
-    if (!hasComposite) return;
+    if (!hasComposite) {
+      // Nothing to send (compositing failed): don't strand the customer on a
+      // hidden step. Send them back to the camera to retake.
+      autoFiredRef.current = true;
+      goTo('camera');
+      return;
+    }
     autoFiredRef.current = true;
-    void runSend(settings.autoSendEmail.trim());
-  }, [autoSend, hasComposite, runSend, settings.autoSendEmail]);
+    // Fire-and-forget: the send keeps running after we navigate away; its
+    // result only updates the recorded outcome/transaction, never the UI.
+    void runSend(settings.autoSendEmail.trim(), { navigateOnSuccess: false });
+    goTo('thankyou');
+  }, [autoSend, hasComposite, runSend, goTo, settings.autoSendEmail]);
 
   // --- AUTO mode view ----------------------------------------------------
+  // This renders only for the single frame before the effect navigates away, so
+  // keep it to a neutral, non-email transient (no form, no "sending" wording).
   if (autoSend) {
     return (
       <div className="animate-fade-in flex h-full flex-col items-center justify-center gap-6 px-10 text-center">
-        <h2 className="text-big text-primary-700">Mengirim Foto</h2>
-
-        {!hasComposite ? (
-          <>
-            <div className="animate-pop flex max-w-xl flex-col gap-2 rounded-2xl bg-accent-50 px-6 py-4">
-              <p className="text-touch font-semibold text-accent-700">
-                Foto belum siap diproses.
-              </p>
-              <p className="text-base text-accent-600">
-                Hasil foto dengan frame gagal dibuat. Silakan kembali untuk
-                mengambil foto lagi.
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-4">
-              <BigButton variant="primary" onClick={() => goTo('camera')}>
-                Kembali ke Foto
-              </BigButton>
-              <BigButton variant="danger" onClick={reset}>
-                Batal
-              </BigButton>
-            </div>
-          </>
-        ) : !queuedNote ? (
-          <>
-            <p className="text-touch max-w-xl text-primary-700">
-              Foto kamu sedang dikirim. Tunggu sebentar ya.
-            </p>
-            <span className="animate-pulse text-6xl">📤</span>
-            {/* Batal stays available so the session can never get stuck. */}
-            <BigButton variant="danger" onClick={reset}>
-              Batal
-            </BigButton>
-          </>
-        ) : (
-          <>
-            <div className="animate-pop flex max-w-xl flex-col gap-2 rounded-2xl bg-accent-50 px-6 py-4">
-              <p className="text-touch font-semibold text-accent-700">
-                Email belum terkirim dan sudah masuk antrean.
-              </p>
-              <p className="text-base text-accent-600">
-                Foto akan dikirim otomatis saat internet kembali. Kamu bisa coba
-                kirim ulang atau lanjut.
-              </p>
-              {queuePersistError && (
-                <p className="text-sm font-semibold text-accent-600">
-                  Perhatian: penyimpanan antrean penuh, antrean mungkin hilang
-                  jika aplikasi dimuat ulang. Sebaiknya coba kirim ulang
-                  sekarang.
-                </p>
-              )}
-              {sendError && (
-                <p className="text-sm text-accent-500">Detail: {sendError}</p>
-              )}
-            </div>
-            <div className="flex flex-wrap justify-center gap-4">
-              <BigButton
-                variant="primary"
-                disabled={sending}
-                onClick={() => void runSend(settings.autoSendEmail.trim())}
-              >
-                {sending ? 'Mengirim…' : 'Kirim Ulang'}
-              </BigButton>
-              <BigButton variant="secondary" onClick={() => goTo('thankyou')}>
-                Lanjut
-              </BigButton>
-              <BigButton variant="danger" onClick={reset}>
-                Batal
-              </BigButton>
-            </div>
-          </>
-        )}
+        <span className="animate-pulse text-6xl">✨</span>
       </div>
     );
   }
