@@ -69,7 +69,7 @@ function FrameScreen() {
         <SlotFrameView
           frame={selectedFrame}
           fallbackCount={previewSlotCount}
-          stageClassName="max-h-[60vh] w-auto max-w-[18rem] rounded-3xl border-4 border-primary-200 bg-white shadow-card"
+          stageClassName="mx-auto w-full max-w-[18rem] rounded-3xl border-4 border-primary-200 bg-white shadow-card"
           renderSlot={(i) => (
             <div className="flex h-full w-full items-center justify-center bg-primary-100 text-base font-semibold text-primary-300 shadow-inner">
               {i + 1}

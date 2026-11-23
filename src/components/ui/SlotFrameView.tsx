@@ -16,7 +16,9 @@
  *   - The coordinate box (`stageClassName`) has `aspectRatio` = the frame
  *     image's natural width/height. Because the box ratio equals the image
  *     ratio, the image fills it with NO letterboxing.
- *   - The frame image is positioned `inset-0 h-full w-full` inside that box.
+ *   - The frame image is positioned `inset-0 h-full w-full object-contain`
+ *     inside that box (object-contain, like the editor backdrop, so sub-pixel
+ *     rounding of the aspect-ratio box never stretches the artwork).
  *   - Each slot is positioned `absolute` with left/top/width/height =
  *     slot.(x,y,width,height) * 100% of that SAME box.
  *   - Any decorative border/rounding/shadow also lives on this box, but a
@@ -54,8 +56,12 @@ type SlotFrameViewProps = {
   renderSlot: (index: number, slot: FrameSlot) => ReactNode;
   /**
    * Classes applied to the STAGE (the aspect-ratio coordinate box). Use this to
-   * size/bound the preview (e.g. `max-h-[60vh] w-auto`) and to add the
-   * decorative border/rounding/shadow. Do NOT add padding here.
+   * size/bound the preview and to add the decorative border/rounding/shadow.
+   * Size the stage along a SINGLE axis (width, e.g. `w-full max-w-[18rem]`, OR
+   * height, e.g. `h-full max-h-full w-auto`) and let `aspectRatio` drive the
+   * other axis. Do NOT combine `max-h` + `max-w` + `w-auto` on this box: with
+   * neither axis given a definite size the ratio can break and the frame
+   * artwork stretches. Do NOT add padding here.
    */
   stageClassName?: string;
 };
@@ -149,7 +155,7 @@ function SlotFrameView({
         <img
           src={frame.src}
           alt={`Frame ${frame.name}`}
-          className="pointer-events-none absolute inset-0 h-full w-full"
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
           draggable={false}
         />
       )}
