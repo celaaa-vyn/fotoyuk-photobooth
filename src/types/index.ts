@@ -20,7 +20,7 @@ export type KioskStep =
   | 'thankyou'
   | 'admin';
 
-/** A single captured photo as a data URL (un-mirrored, full resolution). */
+/** A single captured photo as a data URL (mirrored to match the live preview, full resolution). */
 export type CapturedPhoto = {
   id: string;
   /** JPEG/PNG data URL of the captured frame (not mirrored). */

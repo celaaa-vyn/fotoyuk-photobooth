@@ -24,9 +24,11 @@
  *    fixed STRIP_WIDTH x STRIP_HEIGHT canvas) so pre-existing frames still
  *    composite without any migration.
  *
- * Mirroring rule (authoritative): captured photos are already un-mirrored, and
- * this function does not flip them, so printed text on frames reads correctly.
- * Output is a high-quality JPEG by default (smaller for email).
+ * Mirroring rule (authoritative): captured photos are already mirrored once by
+ * useCamera.capture (to match the live preview the user saw). This function
+ * does NOT flip them again (no double-mirror); it only draws the photos as-is
+ * and overlays the frame artwork, which is never mirrored so its text reads
+ * correctly. Output is a high-quality JPEG by default (smaller for email).
  * ----------------------------------------------------------------------------
  */
 import { STRIP_COLUMNS, STRIP_ROWS } from '../components/screens/CameraScreen';
@@ -259,8 +261,9 @@ async function compositeLegacyStrip(
  * Picks the SLOT path when `slots` is provided and non-empty, otherwise falls
  * back to the LEGACY strip grid for backward compatibility.
  *
- * @param photoDataUrls Captured photo data URLs (un-mirrored). Extra photos
- *   beyond the slot/grid capacity are ignored; missing cells stay background.
+ * @param photoDataUrls Captured photo data URLs (already mirrored once to match
+ *   the live preview; not flipped again here). Extra photos beyond the
+ *   slot/grid capacity are ignored; missing cells stay background.
  * @param frameSrc      Transparent frame PNG path/data URL, or null for none.
  * @param slots         Admin-defined photo slots (0..1 units). Omit/empty for
  *                      the legacy strip fallback.

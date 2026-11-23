@@ -213,7 +213,7 @@ function hydrateSettings(): Settings {
 export type KioskState = {
   /** Current flow step rendered by App. */
   step: KioskStep;
-  /** Photos captured this session (un-mirrored data URLs). */
+  /** Photos captured this session (mirrored to match the live preview). */
   capturedPhotos: CapturedPhoto[];
   /** Id of the frame chosen on the frame screen. */
   selectedFrameId: string | null;
