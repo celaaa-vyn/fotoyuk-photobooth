@@ -12,6 +12,7 @@ import WelcomeScreen from './components/screens/WelcomeScreen';
 import PaymentScreen from './components/screens/PaymentScreen';
 import CameraScreen from './components/screens/CameraScreen';
 import FrameScreen from './components/screens/FrameScreen';
+import PreviewScreen from './components/screens/PreviewScreen';
 import EmailScreen from './components/screens/EmailScreen';
 import ThankYouScreen from './components/screens/ThankYouScreen';
 import AdminScreen from './components/screens/AdminScreen';
@@ -29,6 +30,8 @@ function renderStep(step: KioskStep) {
       return <CameraScreen />;
     case 'frame':
       return <FrameScreen />;
+    case 'preview':
+      return <PreviewScreen />;
     case 'email':
       return <EmailScreen />;
     case 'thankyou':

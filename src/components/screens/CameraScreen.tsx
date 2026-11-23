@@ -5,7 +5,16 @@
  * every shot the user previews just that photo and chooses "Ulangi" (retake
  * only that photo, max 2x per photo) or "Lanjut" (accept and move on). When the
  * last photo is accepted the photos are stored, the final composite is built
- * from the selected frame + captured photos, and the flow advances to email.
+ * from the selected frame + captured photos, and the flow advances to the
+ * preview step (which in turn leads to email).
+ *
+ * A live strip preview sits to the RIGHT of the camera: as each photo is
+ * accepted it drops into its slot in real time, so the customer sees the strip
+ * fill up. The plain captured-photo thumbnails remain BELOW the camera.
+ *
+ * The live camera preview's aspect ratio follows the slot currently being
+ * photographed (slot index = number of photos already accepted), so the framing
+ * matches where the shot will land in the strip.
  *
  * Mirroring rule (authoritative): the live <video> preview is mirrored via CSS
  * `transform: scaleX(-1)` so it feels natural, but useCamera.capture() grabs
@@ -18,9 +27,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import BigButton from '../ui/BigButton';
+import StripPreview from '../ui/StripPreview';
 import { useKioskStore } from '../../store/useKioskStore';
 import { useCamera } from '../../hooks/useCamera';
-import { compositePhoto } from '../../utils/compositePhoto';
+import {
+  compositePhoto,
+  STRIP_WIDTH,
+  STRIP_HEIGHT,
+} from '../../utils/compositePhoto';
 import type { CapturedPhoto } from '../../types';
 
 /** Fallback photo count for legacy frames that have no slot definitions. */
@@ -152,9 +166,11 @@ function CameraScreen() {
 
   /**
    * Finish: store the captured photos, build the final composite from the
-   * selected frame + photos (legacy strip compositor for PR2), and advance to
-   * the email step. If compositing fails the EmailScreen guard will steer the
-   * user back, so we still advance but with a null composite.
+   * selected frame + photos, and advance to the PREVIEW step so the customer
+   * can confirm the result before entering their email. The composite is stored
+   * once here and reused by both PreviewScreen and EmailScreen. If compositing
+   * fails we still advance (with a null composite); the downstream guards steer
+   * the user back rather than sending an empty image.
    */
   const proceed = async () => {
     setBuilding(true);
@@ -172,13 +188,26 @@ function CameraScreen() {
       setComposite(null);
     } finally {
       setBuilding(false);
-      goTo('email');
+      goTo('preview');
     }
   };
 
   const currentPhoto = photos[activeIndex];
   const currentRetakes = retakes[activeIndex] ?? 0;
   const canRetake = currentRetakes < MAX_RETAKES_PER_PHOTO;
+
+  /**
+   * Aspect ratio of the live preview follows the slot currently being shot
+   * (slot index = activeIndex). A slot's pixel size on the final canvas is
+   * (width * STRIP_WIDTH) by (height * STRIP_HEIGHT), so we feed that ratio to
+   * the preview box via CSS `aspect-ratio`. The video stays object-cover so it
+   * crops to the slot ratio instead of distorting. Frames without slots fall
+   * back to a sensible default (the legacy strip cell ratio) so nothing breaks.
+   */
+  const activeSlot = selectedFrame?.slots?.[activeIndex];
+  const previewAspect = activeSlot
+    ? (activeSlot.width * STRIP_WIDTH) / (activeSlot.height * STRIP_HEIGHT)
+    : STRIP_WIDTH / (STRIP_HEIGHT / photoCount);
 
   // --- Camera permission / availability error state ---------------------
   if (error) {
@@ -207,48 +236,69 @@ function CameraScreen() {
 
   return (
     <div className="animate-fade-in flex h-full flex-col items-center gap-6 px-8 py-4">
-      {/* Big centered landscape live-preview area */}
-      <div className="relative flex w-full max-w-5xl flex-1 items-center justify-center overflow-hidden rounded-3xl bg-primary-900 shadow-xl">
-        {/* Mirrored live preview; captured frames stay un-mirrored. */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="h-full w-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
-        />
-        {!ready && (
-          <p className="absolute text-touch text-white/80">Menyalakan kamera…</p>
-        )}
-        {ready && phase === 'idle' && (
-          <p className="absolute text-touch text-white/80">
-            Siap berfoto? Tekan mulai!
-          </p>
-        )}
-        {phase === 'countdown' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
-            <span className="text-[8rem] font-extrabold text-white drop-shadow-lg">
-              {count === 0 ? '📸' : count}
-            </span>
-            <span className="text-touch text-white/90">
-              Foto {activeIndex + 1} dari {photoCount}
-            </span>
-          </div>
-        )}
-        {/* Per-photo review: show just the captured photo over the preview. */}
-        {phase === 'review' && currentPhoto && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70">
-            <img
-              src={currentPhoto.dataUrl}
-              alt={`Pratinjau foto ${activeIndex + 1}`}
-              className="max-h-[70%] max-w-[80%] rounded-2xl object-contain shadow-xl"
+      {/* Camera (left/centre) + live strip preview (right) side by side. */}
+      <div className="flex min-h-0 w-full max-w-6xl flex-1 items-stretch justify-center gap-6">
+        {/* Big live-preview area. Its aspect ratio follows the active slot so
+            the framing matches where this shot lands in the strip. */}
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div
+            className="relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-3xl bg-primary-900 shadow-xl"
+            style={{ aspectRatio: previewAspect, height: '100%' }}
+          >
+            {/* Mirrored live preview; captured frames stay un-mirrored. The
+                video is object-cover so it crops to the slot ratio instead of
+                distorting. */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="h-full w-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
             />
-            <span className="text-touch text-white/90">
-              Foto {activeIndex + 1} dari {photoCount}
-            </span>
+            {!ready && (
+              <p className="absolute text-touch text-white/80">Menyalakan kamera…</p>
+            )}
+            {ready && phase === 'idle' && (
+              <p className="absolute px-4 text-center text-touch text-white/80">
+                Siap berfoto? Tekan mulai!
+              </p>
+            )}
+            {phase === 'countdown' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
+                <span className="text-[8rem] font-extrabold text-white drop-shadow-lg">
+                  {count === 0 ? '📸' : count}
+                </span>
+                <span className="text-touch text-white/90">
+                  Foto {activeIndex + 1} dari {photoCount}
+                </span>
+              </div>
+            )}
+            {/* Per-photo review: show just the captured photo over the preview. */}
+            {phase === 'review' && currentPhoto && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70">
+                <img
+                  src={currentPhoto.dataUrl}
+                  alt={`Pratinjau foto ${activeIndex + 1}`}
+                  className="max-h-[70%] max-w-[80%] rounded-2xl object-contain shadow-xl"
+                />
+                <span className="text-touch text-white/90">
+                  Foto {activeIndex + 1} dari {photoCount}
+                </span>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Live strip preview on the right: fills in real time as photos are
+            accepted. This is ADDITIONAL to the plain thumbnails below. */}
+        <div className="w-40 shrink-0 sm:w-48 lg:w-56">
+          <StripPreview
+            frame={selectedFrame}
+            photos={photos}
+            fallbackCount={photoCount}
+          />
+        </div>
       </div>
 
       {/* Thumbnails of captured photos (dynamic N). */}
@@ -302,7 +352,7 @@ function CameraScreen() {
               disabled={building}
               onClick={() => void proceed()}
             >
-              {building ? 'Memproses…' : 'Lanjut ke Email'}
+              {building ? 'Memproses…' : 'Lihat Pratinjau'}
             </BigButton>
           )}
           {/* Always offer an escape back to welcome so no one gets stuck. */}

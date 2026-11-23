@@ -1,5 +1,5 @@
 /**
- * Top-of-screen progress indicator for the 6 mandatory flow steps.
+ * Top-of-screen progress indicator for the mandatory flow steps.
  * The current step is highlighted; completed steps are filled. Hidden on the
  * admin screen (App decides whether to render it).
  */
@@ -11,6 +11,7 @@ const FLOW_STEPS: { step: KioskStep; label: string }[] = [
   { step: 'payment', label: 'Bayar' },
   { step: 'frame', label: 'Frame' },
   { step: 'camera', label: 'Foto' },
+  { step: 'preview', label: 'Pratinjau' },
   { step: 'email', label: 'Email' },
   { step: 'thankyou', label: 'Selesai' },
 ];
